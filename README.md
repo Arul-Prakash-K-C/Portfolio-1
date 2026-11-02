@@ -13,7 +13,13 @@ npm run preview    # serve the production build
 npm run check      # svelte-check
 ```
 
-Deploy `build/` to any static host. On Vercel, import the repo and keep the defaults: the build command is `npm run build` and the output directory is `build`.
+### Deploying to Vercel
+
+`vercel.json` pins the SvelteKit framework preset and the install and build commands. `adapter-static` detects Vercel and writes Vercel's own output format, so no output directory needs setting.
+
+Vercel builds the repository's **production branch** (currently `master`). That branch has to contain this code; if it only has the README, the build fails with `Command "vite build" exited with 127`, because nothing gets installed. Merge the work into `master`, or point Vercel at the branch that has it. If the project was created with the **Vite** preset, change it to **SvelteKit** (or leave it to `vercel.json`).
+
+For any other static host, deploy the `build/` folder.
 
 ## Where things live
 
@@ -21,7 +27,8 @@ Deploy `build/` to any static host. On Vercel, import the repo and keep the defa
 | --- | --- |
 | `src/lib/data/profile.js` | Name, contact, résumé link, education, experience, certifications, skills |
 | `src/lib/data/projects.js` | Voyage log: project case studies and smaller log entries |
-| `src/lib/scene/voyage.js` | The 3D scene: ocean shader, ship, robot, stars, built entirely in code |
+| `src/lib/scene/voyage.js` | The 3D scene: Gerstner-wave ocean, sky and clouds, fog banks, camera path and the film post-processing chain |
+| `src/lib/scene/galleon.js` | The original galleon, *The Night Compiler*: a lofted hull with procedural textures, rig, sails and the robot crew member |
 | `src/lib/components/` | Page sections, the case-study dialog, nav and the robot companion ("Bit") |
 | `static/projects/` | Project screenshots |
 
@@ -41,6 +48,7 @@ Empty fields are **hidden**, never shown as placeholders. Fill them in and the m
 - **No WebGL or a lost context:** the illustration stays.
 - **`prefers-reduced-motion`:** a single still frame, with animation only if the visitor asks for it.
 - The scene pauses when it scrolls offscreen or the tab is hidden. A **Pause scene** button is always available.
+- **Desktop:** the scene runs through a film-style post-processing chain: bloom, a teal-and-amber grade, grain and a vignette. Phones skip it for performance.
 - Scrolling through the hero moves the camera from a wide shot, past the deck, up into the stars. It never pins or hijacks scrolling.
 
 ## Content sources
@@ -55,7 +63,7 @@ Every claim is backed by a source, and each case study names its own:
 
 | Asset | Source | License |
 | --- | --- | --- |
-| Ship, robot, ocean, sky, favicon, fallback illustration | Original, generated in code for this site | Part of this repo |
+| Galleon, robot, ocean, sky, textures, favicon, fallback illustration | Original, generated in code for this site (the galleon is an original design, not a replica of any film or game ship) | Part of this repo |
 | Project screenshots | Arul's own project reports | Arul's own work |
 | Cinzel font | `@fontsource/cinzel` | SIL OFL 1.1 |
 | Inter font | `@fontsource-variable/inter` | SIL OFL 1.1 |
