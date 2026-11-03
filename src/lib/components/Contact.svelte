@@ -16,17 +16,18 @@
 	const tel = profile.phone.replace(/[^+\d]/g, '');
 </script>
 
-<section id="contact" class="section contact" aria-labelledby="contact-title">
-	<div class="container inner">
-		<header class="section-head reveal" use:reveal>
-			<p class="eyebrow">Log 05 · Send a signal</p>
+<section id="contact" class="section stage-section contact" aria-labelledby="contact-title">
+	<div class="container split">
+	<div class="panel reveal" use:reveal>
+		<header class="section-head">
+			<p class="eyebrow">Log 05 · Signal from the island</p>
 			<h2 id="contact-title" class="section-title">Contact</h2>
 			<p class="section-lede">
 				Open to full-stack roles, internships and freelance builds. The fastest way to reach Arul is below.
 			</p>
 		</header>
 
-		<ul class="signals reveal" use:reveal>
+		<ul class="signals">
 			{#if profile.email}
 				<li class="signal">
 					<span class="kind">Email</span>
@@ -68,6 +69,24 @@
 		</ul>
 		<p class="toast" role="status" aria-live="polite">{copied}</p>
 	</div>
+
+	<!-- 2D stand-in for the island beacon when the scene is off -->
+	<figure class="art-fallback" aria-hidden="true">
+		<svg viewBox="0 0 200 200" width="240" height="240">
+			<defs>
+				<radialGradient id="fire" cx="0.5" cy="0.5" r="0.5">
+					<stop offset="0" stop-color="#fff2c8" />
+					<stop offset="0.4" stop-color="#ffb04a" stop-opacity=".9" />
+					<stop offset="1" stop-color="#ff7a1f" stop-opacity="0" />
+				</radialGradient>
+			</defs>
+			<circle cx="100" cy="58" r="44" fill="url(#fire)" />
+			<path d="M84 80 L116 80 L124 168 L76 168 Z" fill="#3a3833" />
+			<rect x="78" y="74" width="44" height="8" fill="#d9a84e" />
+			<path d="M20 170 Q100 150 180 170 L180 190 L20 190 Z" fill="#141a22" />
+		</svg>
+	</figure>
+	</div>
 </section>
 
 <style>
@@ -77,8 +96,8 @@
 			linear-gradient(180deg, #06121a, var(--ink));
 		border-top: 1px solid var(--line);
 	}
-	.inner {
-		max-width: 860px;
+	.signals {
+		margin-top: 4px;
 	}
 	.signals {
 		list-style: none;

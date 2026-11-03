@@ -1,23 +1,29 @@
+<!--
+  One fixed 3D canvas behind the whole page. Native scrolling drives a single
+  story timeline (0 opening → 5 contact); nothing is pinned or hijacked.
+  The page is fully usable before, during and without the scene: WebGL is
+  progressive enhancement, signalled by `html.scene-live`.
+-->
 <script>
 	import { onMount } from 'svelte';
-	import HeroFallback from './HeroFallback.svelte';
+	import { onFocus } from '$lib/scene/bus.js';
+	import { projects } from '$lib/data/projects.js';
 
-	/** @type {{ heroEl?: HTMLElement }} */
-	let { heroEl } = $props();
+	const STAGES = ['home', 'about', 'skills', 'projects', 'experience', 'contact'];
 
-	/** 'static' → fallback art only; 'loading'; 'live'; 'unsupported'; 'failed' */
+	/** 'static' | 'loading' | 'live' | 'unsupported' | 'failed' */
 	let mode = $state('static');
 	let paused = $state(false);
-	let reduced = $state(false);
 	let offerLoad = $state(false);
+	let introRunning = $state(false);
 	/** @type {HTMLCanvasElement} */
 	let canvas;
 	/** @type {HTMLDivElement} */
-	let host;
+	let hazeEl;
 	/** @type {any} */
 	let voyage = null;
-	let visible = true;
 	let pageVisible = true;
+	let reduced = false;
 
 	function hasWebGL() {
 		try {
@@ -28,14 +34,43 @@
 		}
 	}
 
-	function shouldRun() {
-		return !!voyage && visible && pageVisible && !paused;
-	}
-
 	function sync() {
 		if (!voyage) return;
-		if (shouldRun()) voyage.start();
+		if (pageVisible && !paused) voyage.start();
 		else voyage.stop();
+	}
+
+	/** Map the scroll position to the story timeline, holding on each stage. */
+	function timeline() {
+		const vh = window.innerHeight;
+		const y = window.scrollY;
+		const els = STAGES.map((id) => document.getElementById(id));
+		if (els.some((e) => !e)) return { t: 0, projectsFrac: 0 };
+		const anchors = els.map((e, i) => (i === 0 ? 0 : /** @type {HTMLElement} */ (e).offsetTop - vh * 0.35));
+		let t = STAGES.length - 1;
+		for (let i = 0; i < anchors.length - 1; i++) {
+			if (y < anchors[i + 1]) {
+				const len = Math.max(anchors[i + 1] - anchors[i], 1);
+				const frac = Math.min(Math.max((y - anchors[i]) / len, 0), 1);
+				// hold the shot, then travel during the last ~0.9 screens before the next section
+				const w = Math.min(1, (0.9 * vh) / len);
+				const x = Math.min(Math.max((frac - (1 - w)) / w, 0), 1);
+				const eased = reduced ? (x > 0.5 ? 1 : 0) : x * x * (3 - 2 * x);
+				t = i + eased;
+				break;
+			}
+		}
+		const p = /** @type {HTMLElement} */ (els[3]);
+		const projectsFrac = Math.min(Math.max((y + vh * 0.6 - p.offsetTop) / p.offsetHeight, 0), 1);
+		return { t, projectsFrac };
+	}
+
+	function update(instant = false) {
+		if (!voyage) return;
+		const { t, projectsFrac } = timeline();
+		voyage.setTimeline(t, instant);
+		voyage.setFocus({ projectsFrac });
+		if (!voyage.running) voyage.renderStill();
 	}
 
 	async function load() {
@@ -45,21 +80,40 @@
 		try {
 			const { createVoyage } = await import('$lib/scene/voyage.js');
 			const narrow = window.innerWidth < 760;
-			voyage = createVoyage(canvas, { quality: narrow ? 'low' : 'high' });
+			// the fly-in plays on larger screens from the top of the page; phones start on the hero shot
+			const playIntro = !reduced && !narrow && window.scrollY < 40;
+			voyage = createVoyage(canvas, {
+				quality: narrow ? 'low' : 'high',
+				destinations: projects.map((p) => ({ title: p.title })),
+				intro: playIntro,
+				onIntroEnd: () => (introRunning = false),
+				onFrame: (/** @type {number} */ haze) => {
+					if (hazeEl) hazeEl.style.opacity = String(Math.min(haze * 0.5, 0.5));
+				}
+			});
 			canvas.addEventListener('webglcontextlost', (e) => {
 				e.preventDefault();
 				voyage?.stop();
 				mode = 'failed';
+				document.documentElement.classList.remove('scene-live');
 			});
-			updateScroll();
+			update(true);
 			voyage.renderStill();
 			mode = 'live';
+			document.documentElement.classList.add('scene-live');
+			introRunning = playIntro;
 			sync();
 		} catch (err) {
-			console.warn('3D scene unavailable, keeping the illustrated fallback.', err);
+			console.warn('3D scene unavailable, keeping the illustrated page.', err);
 			voyage = null;
 			mode = 'failed';
+			document.documentElement.classList.remove('scene-live');
 		}
+	}
+
+	function skipIntro() {
+		voyage?.skipIntro();
+		introRunning = false;
 	}
 
 	function togglePause() {
@@ -67,44 +121,24 @@
 		sync();
 	}
 
-	function updateScroll() {
-		if (!voyage || !heroEl) return;
-		const h = heroEl.offsetHeight || window.innerHeight;
-		const p = Math.min(Math.max(window.scrollY / h, 0), 1);
-		voyage.setScroll(p);
-		if (!voyage.running && mode === 'live') voyage.renderStill();
-	}
-
 	onMount(() => {
 		const mq = matchMedia('(prefers-reduced-motion: reduce)');
 		reduced = mq.matches;
-		paused = reduced; // reduced motion: a still frame, animation only on request
+		paused = reduced; // reduced motion: still frames that follow the scroll, animation on request
 
 		if (!hasWebGL()) {
 			mode = 'unsupported';
 			return;
 		}
-
 		const conn = /** @type {any} */ (navigator).connection;
-		const saveData = !!conn?.saveData;
-		const small = window.innerWidth < 640;
-
-		if (small || saveData) {
-			offerLoad = true; // phones / data saver: illustrated scene, 3D on request
+		if (window.innerWidth < 640 || conn?.saveData) {
+			offerLoad = true; // phones / data saver: illustrated page, 3D on request
 		} else {
-			// load after first paint so the hero text is never blocked
 			const idle = /** @type {any} */ (window).requestIdleCallback || ((/** @type {any} */ fn) => setTimeout(fn, 200));
 			idle(() => load(), { timeout: 1500 });
 		}
 
-		const io = new IntersectionObserver(
-			([e]) => {
-				visible = e.isIntersecting;
-				sync();
-			},
-			{ threshold: 0.01 }
-		);
-		io.observe(host);
+		const offFocus = onFocus((f) => voyage?.setFocus({ skill: f.skill, project: f.project }));
 
 		const onVis = () => {
 			pageVisible = document.visibilityState === 'visible';
@@ -114,11 +148,12 @@
 
 		let ticking = false;
 		const onScroll = () => {
+			if (introRunning && window.scrollY > 40) skipIntro();
 			if (ticking) return;
 			ticking = true;
 			requestAnimationFrame(() => {
 				ticking = false;
-				updateScroll();
+				update();
 			});
 		};
 		window.addEventListener('scroll', onScroll, { passive: true });
@@ -130,60 +165,70 @@
 		};
 		if (fine) window.addEventListener('pointermove', onPointer, { passive: true });
 
-		const ro = new ResizeObserver(() => {
+		const onResize = () => {
 			if (!voyage) return;
 			voyage.resize();
-			if (!voyage.running) voyage.renderStill();
-		});
-		ro.observe(host);
+			update(true);
+		};
+		window.addEventListener('resize', onResize);
+		// sections change height as fonts/images load; keep the anchors fresh
+		const ro = new ResizeObserver(() => update());
+		ro.observe(document.body);
 
 		const onMq = () => {
 			reduced = mq.matches;
 			if (reduced) {
 				paused = true;
+				skipIntro();
 				sync();
 			}
 		};
 		mq.addEventListener('change', onMq);
 
 		return () => {
-			io.disconnect();
+			offFocus();
 			ro.disconnect();
 			document.removeEventListener('visibilitychange', onVis);
 			window.removeEventListener('scroll', onScroll);
 			window.removeEventListener('pointermove', onPointer);
+			window.removeEventListener('resize', onResize);
 			mq.removeEventListener('change', onMq);
 			voyage?.dispose();
 			voyage = null;
+			document.documentElement.classList.remove('scene-live');
 		};
 	});
 </script>
 
-<div class="scene" bind:this={host} data-mode={mode}>
-	<HeroFallback />
-	<canvas bind:this={canvas} class:on={mode === 'live'} aria-hidden="true"></canvas>
-	<div class="veil" aria-hidden="true"></div>
+<div class="stage" aria-hidden="true">
+	<canvas bind:this={canvas} class:on={mode === 'live'}></canvas>
+	<div class="haze" bind:this={hazeEl}></div>
 </div>
 
-<div class="scene-controls">
+<div class="scene-controls" role="group" aria-label="3D scene">
+	{#if introRunning}
+		<button class="ctrl" type="button" onclick={skipIntro}>Skip intro</button>
+	{/if}
 	{#if mode === 'live'}
-		<button class="ctrl" type="button" onclick={togglePause} aria-pressed={paused}>
+		<button class="ctrl toggle" type="button" onclick={togglePause} aria-pressed={paused} aria-label={paused ? 'Animate the 3D scene' : 'Pause the 3D scene'}>
 			<span class="dot" class:still={paused} aria-hidden="true"></span>
-			{paused ? 'Animate scene' : 'Pause scene'}
+			<span class="label" aria-hidden="true">{paused ? 'Animate scene' : 'Pause scene'}</span>
 		</button>
 	{:else if mode === 'loading'}
-		<span class="ctrl status" role="status">Rigging the 3D scene…</span>
+		<span class="ctrl status" role="status">Rigging the 3D voyage…</span>
+	{:else if mode === 'failed'}
+		<span class="ctrl status" role="status">3D scene unavailable, showing the illustrated version</span>
 	{:else if offerLoad}
-		<button class="ctrl" type="button" onclick={load}>Load 3D scene</button>
+		<button class="ctrl" type="button" onclick={load}>Load 3D voyage</button>
 	{/if}
 </div>
 
 <style>
-	.scene {
-		position: absolute;
+	.stage {
+		position: fixed;
 		inset: 0;
-		overflow: hidden;
-		background: #050a14;
+		z-index: 0;
+		pointer-events: none;
 	}
 	canvas {
 		position: absolute;
@@ -192,41 +237,36 @@
 		height: 100%;
 		display: block;
 		opacity: 0;
-		transition: opacity 1.2s var(--ease-out);
+		transition: opacity 1.4s var(--ease-out);
 	}
 	canvas.on {
 		opacity: 1;
 	}
-	/* readability veil: darkens the left side where the text sits, and the bottom edge */
-	.veil {
+	.haze {
 		position: absolute;
 		inset: 0;
-		background:
-			linear-gradient(90deg, rgba(6, 11, 21, 0.82) 0%, rgba(6, 11, 21, 0.45) 42%, rgba(6, 11, 21, 0) 68%),
-			linear-gradient(180deg, rgba(6, 11, 21, 0) 60%, var(--ink) 100%);
-		pointer-events: none;
-	}
-	@media (max-width: 860px) {
-		.veil {
-			background:
-				linear-gradient(180deg, rgba(6, 11, 21, 0.35) 0%, rgba(6, 11, 21, 0.8) 55%, var(--ink) 100%);
-		}
+		background: radial-gradient(120% 90% at 60% 50%, #2a3a52 0%, #0d1a2e 70%);
+		opacity: 0;
+		will-change: opacity;
 	}
 	.scene-controls {
-		position: absolute;
-		right: var(--gutter);
-		bottom: 28px;
-		z-index: 3;
+		position: fixed;
+		right: 16px;
+		bottom: 16px;
+		z-index: 80;
+		display: flex;
+		gap: 8px;
+		align-items: center;
 	}
 	.ctrl {
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		min-height: 36px;
+		min-height: 40px;
 		padding: 6px 14px;
 		border-radius: 999px;
 		border: 1px solid var(--line-strong);
-		background: rgba(6, 11, 21, 0.6);
+		background: rgba(6, 11, 21, 0.78);
 		color: var(--parchment-2);
 		font-family: var(--font-mono);
 		font-size: 0.75rem;
@@ -251,5 +291,34 @@
 	.dot.still {
 		background: var(--muted);
 		box-shadow: none;
+	}
+	/* phones: tuck the controls into the header bar, beside the menu button */
+	@media (max-width: 759px) {
+		.scene-controls {
+			top: 12px;
+			bottom: auto;
+			right: 128px;
+			z-index: 110;
+		}
+		.ctrl {
+			min-height: 40px;
+		}
+		.toggle {
+			width: 40px;
+			padding: 0;
+			justify-content: center;
+		}
+		.toggle .label {
+			display: none;
+		}
+		.status {
+			display: none;
+		}
+	}
+	@media print {
+		.stage,
+		.scene-controls {
+			display: none;
+		}
 	}
 </style>

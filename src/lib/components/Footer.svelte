@@ -1,7 +1,7 @@
 <script>
 	import { profile } from '$lib/data/profile.js';
 	const year = new Date().getFullYear();
-	const links = ['Home', 'Projects', 'About', 'Skills', 'Experience', 'Contact'];
+	const links = ['Home', 'About', 'Skills', 'Projects', 'Experience', 'Contact'];
 </script>
 
 <footer class="footer">
@@ -21,7 +21,7 @@
 	</div>
 	<div class="container base">
 		<p>© {year} {profile.name}. Scene, ship and robot are original, generated in code.</p>
-		<a href="#home">Back to top ↑</a>
+		<a href="#home">Back to the start of the voyage ↑</a>
 	</div>
 </footer>
 

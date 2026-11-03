@@ -12,6 +12,8 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { makeGalleon } from './galleon.js';
+import { makeMaterials, makeWheel, makeCaptain, makeChartTable, makeChest } from './props.js';
+import { makeSignalIsle } from './island.js';
 
 const FOG = new THREE.Color('#0d1a2e');
 const TEAL = new THREE.Color('#5ad6c9');
@@ -68,7 +70,9 @@ function makeOcean(segments) {
 			uSky: { value: new THREE.Color('#1c3354') },
 			uTeal: { value: TEAL },
 			uMoonCol: { value: new THREE.Color('#ffeccc') },
-			uLantern: { value: new THREE.Vector3() }
+			uLantern: { value: new THREE.Vector3() },
+			uBeacon: { value: new THREE.Vector3() },
+			uBeaconI: { value: 0 }
 		},
 		vertexShader: /* glsl */ `
       uniform float uTime;
@@ -94,7 +98,8 @@ function makeOcean(segments) {
       }`,
 		fragmentShader: /* glsl */ `
       uniform float uTime;
-      uniform vec3 uMoonDir, uFog, uDeep, uShallow, uSky, uTeal, uMoonCol, uLantern;
+      uniform vec3 uMoonDir, uFog, uDeep, uShallow, uSky, uTeal, uMoonCol, uLantern, uBeacon;
+      uniform float uBeaconI;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vCrest;
@@ -119,6 +124,10 @@ function makeOcean(segments) {
         float lr = pow(max(dot(r, ld), 0.0), 120.0);
         float ldist = length(uLantern - vWorld);
         col += vec3(1.0, 0.62, 0.25) * lr * 2.0 * exp(-ldist * 0.06);
+        // the island beacon's long reflection once it is lit
+        vec3 bd = normalize(uBeacon - vWorld);
+        float br = pow(max(dot(r, bd), 0.0), 60.0);
+        col += vec3(1.0, 0.6, 0.25) * br * 2.5 * uBeaconI;
         // foam on steep crests
         float foam = smoothstep(0.42, 0.62, vCrest) * (0.55 + 0.45 * noise(vWorld.xz * 3.0 + uTime));
         col = mix(col, vec3(0.62, 0.68, 0.74), foam * 0.35);
@@ -371,21 +380,42 @@ const FilmShader = {
     }`
 };
 
+
 /* ------------------------------------------------------------------ */
-/* Public API                                                          */
+/* Story timeline                                                       */
 /* ------------------------------------------------------------------ */
+/*
+ * The page drives a single number, `t`, from 0 to 5:
+ *   0 opening (the ship at sea) · 1 about (captain at the wheel)
+ *   2 skills (chart table + compass) · 3 projects (map destinations)
+ *   4 experience (the logbook) · 5 contact (the signal isle and chest)
+ * Camera keys are in the ship's anchor space so the shots stay framed on
+ * the deck; `follow` blends in the ship's own rocking for deck close-ups.
+ */
+const STAGE_KEYS = [
+	// t, camera position, look target, follow, screen offset (fraction of width, desktop only)
+	{ t: 0.5, pos: [-1.0, 4.4, 7.8], look: [-3.8, 2.4, 0], follow: 0.5, offset: 0.1 },
+	{ t: 1, pos: [-2.6, 2.95, 2.9], look: [-4.8, 2.75, 0.05], follow: 1, offset: 0.2 },
+	{ t: 2, pos: [-1.3, 2.9, 1.6], look: [-1.86, 1.32, -0.04], follow: 1, offset: 0.2 },
+	{ t: 3, pos: [-2.0, 3.25, 0.62], look: [-2.03, 1.33, -0.02], follow: 1, offset: 0.0 },
+	{ t: 4, pos: [-1.05, 1.92, 0.98], look: [-1.52, 1.36, 0.16], follow: 1, offset: 0.16 },
+	{ t: 4.5, pos: [0.2, 3.0, 3.2], look: [8, 2, -2], follow: 0.7, offset: 0.12 },
+	{ t: 5, pos: [1.0, 1.85, 1.6], look: [12, 0.95, -3.5], follow: 0.4, offset: 0.18 }
+];
+const ISLE_POS = new THREE.Vector3(58, 0, -26); // anchor space, ahead of the bow
+
+const smooth = (e0, e1, x) => {
+	const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
+	return t * t * (3 - 2 * t);
+};
+
 /**
  * @param {HTMLCanvasElement} canvas
- * @param {{ quality?: 'high'|'low' }} [opts]
+ * @param {{ quality?: 'high'|'low', destinations?: {title:string}[], intro?: boolean, onIntroEnd?: () => void, onFrame?: (haze: number) => void }} [opts]
  */
 export function createVoyage(canvas, opts = {}) {
 	const low = opts.quality === 'low';
-	const renderer = new THREE.WebGLRenderer({
-		canvas,
-		antialias: true,
-		alpha: false,
-		powerPreference: 'high-performance'
-	});
+	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 	const dpr = Math.min(window.devicePixelRatio || 1, low ? 1.25 : 1.5);
 	renderer.setPixelRatio(dpr);
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -395,7 +425,7 @@ export function createVoyage(canvas, opts = {}) {
 
 	const scene = new THREE.Scene();
 	scene.fog = new THREE.FogExp2(FOG, 0.0095);
-	const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 1200);
+	const camera = new THREE.PerspectiveCamera(34, 1, 0.05, 1200);
 
 	const sky = makeSky();
 	scene.add(sky.mesh);
@@ -409,14 +439,12 @@ export function createVoyage(canvas, opts = {}) {
 	scene.add(makeIslands());
 	const fog = makeFogBanks();
 	scene.add(fog.group);
-
 	const ocean = makeOcean(low ? 160 : 260);
 	scene.add(ocean.mesh);
 	const motes = makeMotes(low ? 50 : 120);
 	motes.mat.uniforms.uPx.value = dpr;
 	scene.add(motes.points);
 
-	// Lighting: cold moon key from behind, cool sky fill, warm low fill from the viewer side
 	const moonLight = new THREE.DirectionalLight('#d9e2ff', 2.0);
 	moonLight.position.copy(MOON_POS).normalize().multiplyScalar(50);
 	scene.add(moonLight);
@@ -428,72 +456,135 @@ export function createVoyage(canvas, opts = {}) {
 	scene.add(rim);
 	scene.add(new THREE.HemisphereLight('#41598a', '#04070d', 1.1));
 
+	/* the ship, on a steady anchor so camera shots can be framed in ship space */
+	const anchor = new THREE.Group();
+	anchor.position.set(10.5, 0, -11);
+	anchor.rotation.y = -0.32;
+	scene.add(anchor);
 	const g = makeGalleon();
 	const ship = g.ship;
-	ship.scale.setScalar(1);
-	ship.position.set(10.5, 0, -11);
-	ship.rotation.y = -0.32;
-	scene.add(ship);
-	const lanternWorld = new THREE.Vector3();
+	anchor.add(ship);
+
+	/* story props */
+	const mats = makeMaterials();
+	const helm = makeWheel(mats);
+	helm.root.position.set(-4.3, 1.28, 0);
+	helm.root.rotation.y = Math.PI; // wheel faces aft, toward the captain
+	ship.add(helm.root);
+	const captain = makeCaptain(mats);
+	captain.root.position.set(-5.05, 1.28, 0);
+	ship.add(captain.root);
+	const table = makeChartTable(mats, opts.destinations ?? []);
+	table.root.position.set(-1.95, 0.5, 0);
+	ship.add(table.root);
+	g.robot.group.position.set(-1.95, 0.5, -0.82);
+	g.robot.group.rotation.y = 0;
+	const chest = makeChest(mats);
+	chest.root.position.set(4.15, 0.6, 0.15);
+	chest.root.rotation.y = 0.5;
+	ship.add(chest.root);
+	const isle = makeSignalIsle();
+	isle.root.position.copy(ISLE_POS);
+	anchor.add(isle.root);
 
 	/* post-processing (desktop / capable devices only) */
 	let composer = null;
 	let film = null;
+	let bloom = null;
 	if (!low) {
 		composer = new EffectComposer(renderer);
 		composer.setPixelRatio(dpr);
 		composer.addPass(new RenderPass(scene, camera));
-		const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.7, 0.55, 0.78);
+		bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.7, 0.55, 0.78);
 		composer.addPass(bloom);
 		film = new ShaderPass(FilmShader);
 		composer.addPass(film);
 		composer.addPass(new OutputPass());
 	}
 
-	// Camera keyframes along the hero scroll: low wide shot → along the hull → up the masts to the stars
+	/* camera keys: the opening shots are authored in world space, the rest in anchor space */
+	anchor.updateMatrixWorld(true);
+	const toLocal = (v) => anchor.worldToLocal(new THREE.Vector3(...v));
+	const heroKey = { t: 0, pos: toLocal([-2, 2.4, 19]), look: toLocal([6.5, 5.2, -9]), follow: 0, offset: 0 };
+	const introKey = { pos: toLocal([-16, 0.9, 46]), look: toLocal([6, 3.4, -9]) };
 	const keys = [
-		{ p: 0, pos: new THREE.Vector3(-2, 2.4, 19), look: new THREE.Vector3(6.5, 5.2, -9) },
-		{ p: 0.55, pos: new THREE.Vector3(3.5, 2.6, 11), look: new THREE.Vector3(11, 5.0, -11) },
-		{ p: 1, pos: new THREE.Vector3(5, 5, 9), look: new THREE.Vector3(11, 22, -34) }
+		heroKey,
+		...STAGE_KEYS.map((k) => ({ ...k, pos: new THREE.Vector3(...k.pos), look: new THREE.Vector3(...k.look) }))
 	];
-	const tmpPos = new THREE.Vector3();
-	const tmpLook = new THREE.Vector3();
 
-	let scroll = 0,
-		scrollSmooth = 0;
+	/* state */
+	let target = 0; // timeline from the page
+	let tl = 0; // smoothed timeline
+	const focus = { skill: 0, project: -1, projectsFrac: 0 };
+	let intro = opts.intro ? 0 : 1;
+	let introPlaying = false;
 	let px = 0,
 		py = 0,
 		pxs = 0,
 		pys = 0;
-	let lookShift = 0;
-	let lookDrop = 0;
-	let pullBack = 1;
 	let raf = 0,
 		running = false,
 		last = performance.now(),
-		time = 0;
+		time = 0,
+		lastInput = performance.now(),
+		frameNo = 0;
+	let narrow = false,
+		vw = 1,
+		vh = 1;
+	let wheelAngle = 0,
+		needleAngle = 0,
+		lidOpen = 0,
+		beaconLit = 0;
+	let haze = 0;
+	const camPos = new THREE.Vector3(),
+		camLook = new THREE.Vector3(),
+		tmpA = new THREE.Vector3(),
+		tmpB = new THREE.Vector3(),
+		lanternWorld = new THREE.Vector3(),
+		beaconWorld = new THREE.Vector3();
+	const handL = new THREE.Vector3(),
+		handR = new THREE.Vector3();
+
+	function sample(t) {
+		let i = 0;
+		while (i < keys.length - 2 && t > keys[i + 1].t) i++;
+		const a = keys[i],
+			b = keys[i + 1];
+		const e = smooth(0, 1, (t - a.t) / (b.t - a.t));
+		return {
+			pos: tmpA.lerpVectors(a.pos, b.pos, e),
+			look: tmpB.lerpVectors(a.look, b.look, e),
+			follow: a.follow + (b.follow - a.follow) * e,
+			offset: a.offset + (b.offset - a.offset) * e
+		};
+	}
 
 	function resize() {
-		const w = canvas.clientWidth || window.innerWidth;
-		const h = canvas.clientHeight || window.innerHeight;
-		renderer.setSize(w, h, false);
-		composer?.setSize(w, h);
-		film?.uniforms.uRes.value.set(w * dpr, h * dpr);
-		camera.aspect = w / h;
-		const narrow = w / h < 0.9;
+		vw = canvas.clientWidth || window.innerWidth;
+		vh = canvas.clientHeight || window.innerHeight;
+		renderer.setSize(vw, vh, false);
+		composer?.setSize(vw, vh);
+		film?.uniforms.uRes.value.set(vw * dpr, vh * dpr);
+		camera.aspect = vw / vh;
+		narrow = vw / vh < 0.9;
 		camera.fov = narrow ? 50 : 34;
-		lookShift = narrow ? 4.6 : w / h < 1.3 ? 2 : 0;
-		// tall portrait heroes: tilt down so the ship sits above the text
-		lookDrop = narrow ? Math.min(11, (h / w - 1) * 6) : 0;
-		pullBack = narrow ? 1.45 : 1;
 		camera.updateProjectionMatrix();
 	}
 
-	function frame(dt) {
+	function frame(dt, realDt = dt) {
 		time += dt;
-		scrollSmooth += (scroll - scrollSmooth) * Math.min(1, dt * 4);
+		// story smoothing runs on real elapsed time so slow devices don't lag a stage behind
+		const k = 1 - Math.exp(-realDt * 3.2);
+		tl += (target - tl) * k;
 		pxs += (px - pxs) * Math.min(1, dt * 2.5);
 		pys += (py - pys) * Math.min(1, dt * 2.5);
+		if (introPlaying) {
+			intro = Math.min(1, intro + realDt / 3.4);
+			if (intro >= 1) {
+				introPlaying = false;
+				opts.onIntroEnd?.();
+			}
+		}
 
 		ocean.mat.uniforms.uTime.value = time;
 		sky.mat.uniforms.uTime.value = time;
@@ -502,24 +593,28 @@ export function createVoyage(canvas, opts = {}) {
 		fog.mat.uniforms.uTime.value = time;
 		if (film) film.uniforms.uTime.value = time;
 
-		// the ship rides the swell: sample four points under the hull
-		const bx = ship.position.x,
-			bz = ship.position.z;
-		const fx = Math.cos(-ship.rotation.y) * 4.5,
-			fz = Math.sin(-ship.rotation.y) * 4.5;
-		const hC = waveHeight(bx, bz, time);
-		const hF = waveHeight(bx + fx, bz + fz, time);
-		const hB = waveHeight(bx - fx, bz - fz, time);
-		const hP = waveHeight(bx - fz * 0.35, bz + fx * 0.35, time);
-		const hS = waveHeight(bx + fz * 0.35, bz - fx * 0.35, time);
-		ship.position.y += (hC * 0.7 + 0.05 - ship.position.y) * Math.min(1, dt * 3);
-		ship.rotation.z += (Math.atan2(hF - hB, 9) * 0.9 - ship.rotation.z) * Math.min(1, dt * 2.5);
-		ship.rotation.x += (Math.atan2(hP - hS, 3.2) * 0.8 - ship.rotation.x) * Math.min(1, dt * 2.5);
+		// stage weights
+		const deck = smooth(0.4, 1, tl) * (1 - smooth(4.3, 4.9, tl)); // close-up deck shots
+		const atTable = Math.max(0, 1 - Math.abs(tl - 3) / 1.6);
 
-		// canvas breathes, pennant streams
-		for (let i = 0; i < g.sails.length; i++) {
-			g.sails[i].scale.x = 1 + Math.sin(time * 1.1 + i * 0.7) * 0.1;
-		}
+		// the ship rides the swell (calmer while we're filming on deck)
+		const wx = anchor.position.x,
+			wz = anchor.position.z;
+		const fx = Math.cos(-anchor.rotation.y) * 4.5,
+			fz = Math.sin(-anchor.rotation.y) * 4.5;
+		const hC = waveHeight(wx, wz, time);
+		const hF = waveHeight(wx + fx, wz + fz, time);
+		const hB = waveHeight(wx - fx, wz - fz, time);
+		const hP = waveHeight(wx - fz * 0.35, wz + fx * 0.35, time);
+		const hS = waveHeight(wx + fz * 0.35, wz - fx * 0.35, time);
+		const amp = 1 - deck * 0.55;
+		const kk = Math.min(1, dt * 2.5);
+		ship.position.y += ((hC * 0.7 + 0.05) * amp - ship.position.y) * kk;
+		ship.rotation.z += (Math.atan2(hF - hB, 9) * 0.9 * amp - ship.rotation.z) * kk;
+		ship.rotation.x += (Math.atan2(hP - hS, 3.2) * 0.8 * amp - ship.rotation.x) * kk;
+
+		// canvas, pennant
+		for (let i = 0; i < g.sails.length; i++) g.sails[i].scale.x = 1 + Math.sin(time * 1.1 + i * 0.7) * 0.1;
 		const fp = g.pennant.geometry.attributes.position;
 		for (let i = 0; i < fp.count; i++) {
 			const x = fp.getX(i);
@@ -527,54 +622,122 @@ export function createVoyage(canvas, opts = {}) {
 		}
 		fp.needsUpdate = true;
 
-		g.robot.armR.rotation.z = -1.1 + Math.sin(time * 3) * 0.35;
+		// the wheel turns as the voyage moves between sections; the captain steers
+		const wheelTarget = tl * 1.25 + Math.sin(time * 0.5) * 0.06;
+		wheelAngle += (wheelTarget - wheelAngle) * Math.min(1, dt * 2);
+		helm.wheel.rotation.x = wheelAngle;
+		const sway = Math.sin(wheelAngle) * 0.05;
+		handL.set(0.45, 1.2 + sway, -0.3);
+		handR.set(0.45, 1.2 - sway, 0.3);
+		captain.reach([handL, handR]);
+		captain.head.rotation.y = Math.sin(time * 0.3) * 0.12 + smooth(0.6, 1, tl) * (1 - smooth(1.2, 1.8, tl)) * 0.35;
+		captain.head.rotation.z = Math.sin(time * 0.45) * 0.03;
+		captain.coatMesh.rotation.y = Math.sin(time * 1.3) * 0.02;
+
+		// robot navigator: works the chart, looks up at the camera on its stage
+		g.robot.armR.rotation.z = -1.1 + Math.sin(time * 3) * 0.35 * (1 - atTable * 0.7);
+		g.robot.group.rotation.y = Math.sin(time * 0.4) * 0.12 + atTable * 0.25;
 		g.robot.tip.visible = Math.sin(time * 4) > -0.6;
 		g.robot.term.update(time);
-		g.lanternLight.intensity = 8.5 + Math.sin(time * 7) * 0.6 + Math.sin(time * 13) * 0.35;
+
+		// compass: points at the skill category, then the active destination
+		let needleTarget = Math.sin(time * 0.7) * 0.08;
+		if (tl > 1.5 && tl < 2.6) needleTarget = focus.skill * (Math.PI / 2) + 0.4;
+		else if (tl >= 2.6 && tl < 3.8 && focus.project >= 0) needleTarget = -0.8 + focus.project * 0.55;
+		needleAngle += (needleTarget - needleAngle) * Math.min(1, dt * 3);
+		table.needle.rotation.y = -needleAngle + Math.sin(time * 6) * 0.01;
+
+		// the chart: route reveals through the projects section, active island pulses
+		const reveal = Math.min(1, smooth(2.4, 3, tl) * 0.18 + focus.projectsFrac * 0.92);
+		table.map.draw(reveal, tl > 2.5 && tl < 3.8 ? focus.project : -1, (time * 0.8) % 1);
+
+		// lanterns
+		const tableGlow = Math.max(smooth(1.2, 2, tl) * (1 - smooth(4.3, 4.9, tl)), 0);
+		table.light.intensity = tableGlow * (1.8 + Math.sin(time * 9) * 0.15);
+		table.flame.scale.y = 1.5 + Math.sin(time * 11) * 0.15;
+		g.lanternLight.intensity = (8.5 - deck * 4) + Math.sin(time * 7) * 0.6 + Math.sin(time * 13) * 0.35;
 		g.lanternLight.getWorldPosition(lanternWorld);
 		ocean.mat.uniforms.uLantern.value.copy(lanternWorld);
 
-		// camera
-		const p = Math.min(Math.max(scrollSmooth, 0), 1);
-		let a = keys[0],
-			b = keys[1];
-		if (p > keys[1].p) {
-			a = keys[1];
-			b = keys[2];
+		// finale: the chest opens and the beacon on Signal Isle ignites
+		const finale = smooth(4.35, 4.95, tl);
+		lidOpen += (finale - lidOpen) * Math.min(1, dt * 2.5);
+		chest.hinge.rotation.x = -lidOpen * 1.9;
+		chest.light.intensity = lidOpen * (2.2 + Math.sin(time * 6) * 0.3);
+		chest.crystal.rotation.y = time * 0.8;
+		beaconLit += (finale - beaconLit) * Math.min(1, dt * 1.5);
+		isle.update(beaconLit, time);
+		isle.light.getWorldPosition(beaconWorld);
+		ocean.mat.uniforms.uBeacon.value.copy(beaconWorld);
+		ocean.mat.uniforms.uBeaconI.value = beaconLit;
+
+		renderer.toneMappingExposure = 1.15 + deck * 0.05;
+		// close-ups sit next to lanterns: soften the bloom so they don't flare
+		if (bloom) {
+			bloom.strength = 0.7 - deck * 0.35;
+			bloom.threshold = 0.78 + deck * 0.12;
 		}
-		const t = (p - a.p) / (b.p - a.p);
-		const e = t * t * (3 - 2 * t);
-		tmpPos.lerpVectors(a.pos, b.pos, e);
-		tmpLook.lerpVectors(a.look, b.look, e);
-		tmpPos.x += lookShift;
-		tmpLook.x += lookShift;
-		tmpLook.y -= lookDrop;
-		if (pullBack !== 1) tmpPos.sub(tmpLook).multiplyScalar(pullBack).add(tmpLook);
-		// slow handheld drift + pointer parallax
+
+		// haze peaks between stages: a fog dissolve, applied by the page as an overlay
+		const frac = tl - Math.floor(tl);
+		haze = tl > 0.6 && tl < 4.95 ? Math.pow(Math.sin(Math.PI * frac), 2) * Math.min(1, Math.abs(target - tl) * 3) : 0;
+		opts.onFrame?.(haze);
+
+		// camera
+		const s = sample(tl);
+		const lp = s.pos.clone();
+		const ll = s.look.clone();
+		if (narrow) {
+			// portrait: tilt so the subject sits above the text, and step back a little
+			const heroW = 1 - smooth(0, 1, tl);
+			const drop = Math.min(11, (vh / vw - 1) * 6) * heroW;
+			ll.y -= drop * 0.35;
+			const pull = 1 + 0.45 * heroW + 0.35 * (1 - heroW);
+			lp.sub(ll).multiplyScalar(pull).add(ll);
+		}
+		// opening fly-in from the water
+		if (intro < 1) {
+			const e = smooth(0, 1, intro);
+			lp.lerpVectors(introKey.pos, lp, e);
+			ll.lerpVectors(introKey.look, ll, e);
+		}
+		const pa = anchor.localToWorld(lp.clone());
+		const pb = ship.localToWorld(lp.clone());
+		const la = anchor.localToWorld(ll.clone());
+		const lb = ship.localToWorld(ll.clone());
+		camPos.lerpVectors(pa, pb, s.follow);
+		camLook.lerpVectors(la, lb, s.follow);
+		const drift = 1 - deck * 0.7;
 		camera.position.set(
-			tmpPos.x + pxs * 0.8 + Math.sin(time * 0.21) * 0.15,
-			tmpPos.y + pys * 0.35 + Math.sin(time * 0.33) * 0.08 + waveHeight(tmpPos.x, tmpPos.z, time) * 0.15,
-			tmpPos.z
+			camPos.x + (pxs * 0.8 + Math.sin(time * 0.21) * 0.15) * drift,
+			camPos.y + (pys * 0.35 + Math.sin(time * 0.33) * 0.06) * drift + (1 - s.follow) * waveHeight(camPos.x, camPos.z, time) * 0.15,
+			camPos.z
 		);
-		camera.lookAt(tmpLook);
+		camera.lookAt(camLook);
+		const off = narrow ? 0 : s.offset;
+		if (off > 0.005) camera.setViewOffset(vw, vh, -off * vw, 0, vw, vh);
+		else if (camera.view) camera.clearViewOffset();
 
 		if (composer) composer.render(dt);
 		else renderer.render(scene, camera);
 	}
 
 	function loop(now) {
-		const dt = Math.min((now - last) / 1000, 0.05);
-		last = now;
-		frame(dt);
 		raf = requestAnimationFrame(loop);
+		const real = Math.min((now - last) / 1000, 0.25);
+		const dt = Math.min(real, 0.05);
+		// when nobody is scrolling or moving the pointer, drop to ~30 fps
+		const idle = now - lastInput > 4000 && !introPlaying && Math.abs(target - tl) < 0.002;
+		frameNo++;
+		if (idle && frameNo % 2) return;
+		last = now;
+		frame(dt, real);
 	}
 
 	resize();
-	// settle the ship onto the water before the first visible frame
 	for (let i = 0; i < 40; i++) {
 		time += 0.05;
-		const hC = waveHeight(ship.position.x, ship.position.z, time);
-		ship.position.y = hC * 0.7 + 0.05;
+		ship.position.y = waveHeight(anchor.position.x, anchor.position.z, time) * 0.7 + 0.05;
 	}
 
 	return {
@@ -584,23 +747,45 @@ export function createVoyage(canvas, opts = {}) {
 		start() {
 			if (running) return;
 			running = true;
+			if (intro < 1 && !introPlaying) introPlaying = true;
 			last = performance.now();
 			raf = requestAnimationFrame(loop);
 		},
 		stop() {
 			running = false;
+			introPlaying = false;
 			cancelAnimationFrame(raf);
 		},
 		get running() {
 			return running;
 		},
-		setScroll(p) {
-			scroll = p;
-			if (!running) scrollSmooth = p;
+		get introDone() {
+			return intro >= 1;
+		},
+		get haze() {
+			return haze;
+		},
+		skipIntro() {
+			if (intro >= 1) return;
+			intro = 1;
+			introPlaying = false;
+			opts.onIntroEnd?.();
+		},
+		/** @param {number} t 0..5 position in the story */
+		setTimeline(t, instant = false) {
+			target = t;
+			lastInput = performance.now();
+			if (instant || !running) tl = t;
+		},
+		/** @param {{skill?: number, project?: number, projectsFrac?: number}} f */
+		setFocus(f) {
+			Object.assign(focus, f);
+			lastInput = performance.now();
 		},
 		setPointer(x, y) {
 			px = x;
 			py = y;
+			lastInput = performance.now();
 		},
 		resize,
 		dispose() {
@@ -608,9 +793,9 @@ export function createVoyage(canvas, opts = {}) {
 			scene.traverse((o) => {
 				if (o.geometry) o.geometry.dispose();
 				if (o.material) {
-					const mats = Array.isArray(o.material) ? o.material : [o.material];
-					for (const m of mats) {
-						for (const k of ['map', 'alphaMap']) m[k]?.dispose?.();
+					const ms = Array.isArray(o.material) ? o.material : [o.material];
+					for (const m of ms) {
+						for (const key of ['map', 'alphaMap']) m[key]?.dispose?.();
 						m.dispose();
 					}
 				}

@@ -8,14 +8,20 @@
 	import { profile } from '$lib/data/profile.js';
 
 	const tips = {
-		home: 'Ahoy! I’m Bit, ship’s engineer. Arul’s projects are one scroll down. No puzzles, promise.',
+		home: 'Ahoy! I’m Bit, ship’s engineer. Scroll to sail on; the nav jumps straight to any port.',
 		projects: 'Every card opens a mission file: the goal, Arul’s role, the stack and where each detail comes from.',
-		about: 'The logbook on the right holds the dates for study and work.',
-		skills: 'No made-up percentages here. Each tool lists the projects that actually use it.',
-		experience: 'Crew record: the current internship and the course projects behind two of the voyages.',
+		about: 'That’s the captain at the wheel. He steers; Arul writes the code.',
+		skills: 'Pick a system and the compass swings to it. No made-up percentages, just where each tool was used.',
+		experience: 'The ship’s log: the current internship, both degrees and the course projects.',
 		contact: profile.email
 			? 'Email is the quickest signal. There’s a copy button if you need it.'
 			: 'GitHub is the open channel for now. The source for most projects lives there.'
+	};
+
+	// without the 3D scene there is no captain or compass to point at
+	const plainTips = {
+		about: 'Education and the current internship are listed right under the intro.',
+		skills: 'No made-up percentages here. Each tool lists the projects that actually use it.'
 	};
 
 	let tip = $state('');
@@ -27,10 +33,11 @@
 
 	/** @param {string} id */
 	function say(id) {
-		// the welcome tip is only shown on request, so it never covers the hero text
-		if (muted || id === 'home' || seen.has(id) || !(id in tips)) return;
+		// tips only pop up where the right-hand side is open sea, never over the hero text or project cards
+		if (muted || id === 'home' || id === 'projects' || seen.has(id) || !(id in tips)) return;
 		seen.add(id);
-		tip = tips[/** @type {keyof typeof tips} */ (id)];
+		const live = document.documentElement.classList.contains('scene-live');
+		tip = (!live && plainTips[/** @type {keyof typeof plainTips} */ (id)]) || tips[/** @type {keyof typeof tips} */ (id)];
 		show = true;
 		clearTimeout(timer);
 		timer = setTimeout(() => (show = false), 7000);
@@ -118,14 +125,13 @@
 <style>
 	.guide {
 		position: fixed;
-		left: 16px;
-		bottom: 16px;
+		right: 16px;
+		bottom: 66px; /* above the scene controls */
 		z-index: 90;
 		display: flex;
-		align-items: flex-end;
 		gap: 10px;
 		flex-direction: column-reverse;
-		align-items: flex-start;
+		align-items: flex-end;
 		pointer-events: none;
 	}
 	.guide > * {
@@ -162,7 +168,7 @@
 	.bubble {
 		max-width: min(290px, calc(100vw - 32px));
 		padding: 14px 16px 10px;
-		border-radius: 14px 14px 14px 4px;
+		border-radius: 14px 14px 4px 14px;
 		border: 1px solid rgba(90, 214, 201, 0.35);
 		background: rgba(6, 16, 24, 0.95);
 		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);

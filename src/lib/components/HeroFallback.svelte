@@ -40,12 +40,12 @@
 			/>
 		{/each}
 	</g>
-	<circle cx="430" cy="210" r="150" fill="url(#fb-moon)" />
-	<circle cx="430" cy="210" r="42" fill="#f4e9cf" />
+	<circle cx="1330" cy="170" r="150" fill="url(#fb-moon)" />
+	<circle cx="1330" cy="170" r="42" fill="#f4e9cf" />
 	<!-- islands -->
 	<path d="M120 590 L230 520 L330 590 Z M1040 590 L1180 500 L1330 590 Z M1360 590 L1420 555 L1480 590 Z" fill="#08111f" />
 	<rect y="588" width="1600" height="312" fill="url(#fb-sea)" />
-	<path d="M400 592 L460 592 L520 900 L340 900 Z" fill="url(#fb-glitter)" opacity="0.6" />
+	<path d="M1300 592 L1360 592 L1420 900 L1240 900 Z" fill="url(#fb-glitter)" opacity="0.6" />
 	<g stroke="#5ad6c9" stroke-opacity="0.18" fill="none">
 		<path d="M0 640 Q200 630 400 640 T800 640 T1200 640 T1600 640" />
 		<path d="M0 700 Q200 688 400 700 T800 700 T1200 700 T1600 700" />

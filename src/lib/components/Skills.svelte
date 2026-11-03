@@ -2,19 +2,24 @@
 	import { skillGroups, projectTools } from '$lib/data/profile.js';
 	import { projects } from '$lib/data/projects.js';
 	import { reveal } from '$lib/actions.js';
+	import { setFocus } from '$lib/scene/bus.js';
 
 	const names = Object.fromEntries(projects.map((p) => [p.id, p.title]));
 	names['turf-booking'] = 'Turf Booking';
 
 	let activeGroup = $state(skillGroups[0].id);
+	const activeIndex = $derived(skillGroups.findIndex((g) => g.id === activeGroup));
+	// steer the 3D compass on the chart table toward the chosen system
+	$effect(() => setFocus({ skill: activeIndex }));
 </script>
 
-<section id="skills" class="section skills" aria-labelledby="skills-title">
+<section id="skills" class="section stage-section skills" aria-labelledby="skills-title">
 	<div class="grid-bg" aria-hidden="true"></div>
-	<div class="container">
+	<div class="container split">
+		<div class="col">
 		<header class="section-head reveal" use:reveal>
-			<p class="eyebrow">Log 03 · Engineering console</p>
-			<h2 id="skills-title" class="section-title">Skills: ship systems</h2>
+			<p class="eyebrow">Log 02 · The navigator’s chart</p>
+			<h2 id="skills-title" class="section-title">Skills</h2>
 			<p class="section-lede">
 				The tools listed on Arul’s résumé, grouped by system. There are no ratings or percentages; each one
 				shows the projects in this log that actually use it.
@@ -24,7 +29,14 @@
 		<div class="console reveal" use:reveal>
 			<div class="console-top" aria-hidden="true">
 				<span class="led"></span><span class="led amber"></span><span class="led off"></span>
-				<span class="readout">systems.status — all hands on deck</span>
+				<span class="readout">heading → {skillGroups[activeIndex].label.toLowerCase()}</span>
+				<svg class="mini-compass" viewBox="0 0 40 40" width="34" height="34">
+					<circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-opacity=".5" />
+					<g class="needle" style:transform={`rotate(${activeIndex * 90 + 23}deg)`}>
+						<path d="M20 5 L23 20 L20 35 L17 20 Z" fill="#d9a84e" />
+						<path d="M20 20 L23 20 L20 35 L17 20 Z" fill="#5ad6c9" />
+					</g>
+				</svg>
 			</div>
 
 			<div class="tabs" role="tablist" aria-label="Skill systems">
@@ -59,7 +71,7 @@
 
 			{#each skillGroups as g}
 				<div
-					class="panel"
+					class="tpanel"
 					role="tabpanel"
 					id={'panel-' + g.id}
 					aria-labelledby={'tab-' + g.id}
@@ -92,6 +104,17 @@
 				{#each projectTools as t}<li class="chip chip-teal">{t}</li>{/each}
 			</ul>
 		</div>
+		</div>
+
+		<!-- 2D stand-in for the 3D chart table and compass -->
+		<figure class="art-fallback" aria-hidden="true">
+			<svg viewBox="0 0 200 200" width="240" height="240">
+				<circle cx="100" cy="100" r="80" fill="none" stroke="#5ad6c9" stroke-opacity=".5" stroke-width="2" />
+				<circle cx="100" cy="100" r="64" fill="none" stroke="#d9a84e" stroke-width="3" />
+				<path d="M100 30 L110 100 L100 170 L90 100 Z" fill="#d9a84e" />
+				<path d="M30 100 L100 92 L170 100 L100 108 Z" fill="#efe4cc" opacity=".6" />
+			</svg>
+		</figure>
 	</div>
 </section>
 
@@ -151,6 +174,22 @@
 	.readout {
 		margin-left: 8px;
 	}
+	@media (max-width: 900px) {
+		:global(html.scene-live) .skills .col {
+			padding: 22px 18px;
+			border-radius: 20px;
+			background: rgba(6, 12, 22, 0.82);
+			border: 1px solid rgba(239, 228, 204, 0.14);
+		}
+	}
+	.mini-compass {
+		margin-left: auto;
+		color: #8fded5;
+	}
+	.needle {
+		transform-origin: 20px 20px;
+		transition: transform 0.7s var(--ease-out);
+	}
 	.tabs {
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -189,10 +228,10 @@
 		font-weight: 600;
 		color: var(--parchment);
 	}
-	.panel {
+	.tpanel {
 		padding: 10px 18px 18px;
 	}
-	.panel:focus-visible {
+	.tpanel:focus-visible {
 		outline-offset: -4px;
 	}
 	.rows {

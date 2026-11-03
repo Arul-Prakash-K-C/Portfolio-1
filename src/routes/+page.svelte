@@ -8,6 +8,7 @@
 	import Contact from '$lib/components/Contact.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import RobotGuide from '$lib/components/RobotGuide.svelte';
+	import SceneHost from '$lib/components/SceneHost.svelte';
 	import { profile } from '$lib/data/profile.js';
 
 	const title = `${profile.name} | ${profile.role}`;
@@ -43,12 +44,13 @@
 </svelte:head>
 
 <a class="skip-link" href="#main">Skip to content</a>
+<SceneHost />
 <Nav />
 <main id="main" tabindex="-1">
 	<Hero />
-	<Projects />
 	<About />
 	<Skills />
+	<Projects />
 	<Experience />
 	<Contact />
 </main>
