@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { onFocus } from '$lib/scene/bus.js';
 	import { projects } from '$lib/data/projects.js';
+	import { ports } from '$lib/data/voyage.js';
 
 	const STAGES = ['home', 'about', 'skills', 'projects', 'experience', 'contact'];
 
@@ -46,7 +47,13 @@
 		const y = window.scrollY;
 		const els = STAGES.map((id) => document.getElementById(id));
 		if (els.some((e) => !e)) return { t: 0, projectsFrac: 0 };
-		const anchors = els.map((e, i) => (i === 0 ? 0 : /** @type {HTMLElement} */ (e).offsetTop - vh * 0.35));
+		const anchors = els.map((e, i) => {
+			if (i === 0) return 0;
+			const el = /** @type {HTMLElement} */ (e);
+			// a section can ask to be reached later, e.g. About waits until its stage window fills the screen
+			const off = el.dataset.stageOffset ? Number(el.dataset.stageOffset) : 0.35;
+			return el.offsetTop - vh * off;
+		});
 		let t = STAGES.length - 1;
 		for (let i = 0; i < anchors.length - 1; i++) {
 			if (y < anchors[i + 1]) {
@@ -85,10 +92,18 @@
 			voyage = createVoyage(canvas, {
 				quality: narrow ? 'low' : 'high',
 				destinations: projects.map((p) => ({ title: p.title })),
+				ports: ports.map((p) => ({ kind: p.kind })),
 				intro: playIntro,
 				onIntroEnd: () => (introRunning = false),
 				onFrame: (/** @type {number} */ haze) => {
 					if (hazeEl) hazeEl.style.opacity = String(Math.min(haze * 0.5, 0.5));
+				},
+				// screen position of the island rising on the chart: project cards grow out of it
+				onPin: (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ on) => {
+					const st = document.documentElement.style;
+					st.setProperty('--pin-x', `${Math.round(x)}px`);
+					st.setProperty('--pin-y', `${Math.round(y)}px`);
+					st.setProperty('--pin-on', on.toFixed(3));
 				}
 			});
 			canvas.addEventListener('webglcontextlost', (e) => {
@@ -99,6 +114,7 @@
 			});
 			update(true);
 			voyage.renderStill();
+			if (import.meta.env.DEV) /** @type {any} */ (window).__voyage = voyage; // dev-only test hook
 			mode = 'live';
 			document.documentElement.classList.add('scene-live');
 			introRunning = playIntro;
@@ -138,7 +154,7 @@
 			idle(() => load(), { timeout: 1500 });
 		}
 
-		const offFocus = onFocus((f) => voyage?.setFocus({ skill: f.skill, project: f.project }));
+		const offFocus = onFocus((f) => voyage?.setFocus({ skill: f.skill, project: f.project, port: f.port }));
 
 		const onVis = () => {
 			pageVisible = document.visibilityState === 'visible';

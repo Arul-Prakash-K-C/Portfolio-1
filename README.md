@@ -82,7 +82,7 @@ Every claim is backed by a source, and each case study names its own:
 
 | Asset | Source | License |
 | --- | --- | --- |
-| Galleon, captain, robot, wheel, chart table, map, compass, telescope, logbook, chest, Signal Isle, ocean, sky, textures, favicon, fallback illustrations | Original, generated in code for this site (no imported models; the ship and characters are original designs, not replicas of any film or game) | Part of this repo |
+| Galleon, captain and salute animation, robot, wheel, chart table, map, project islands, compass, telescope, logbook, chest, lighthouse ports, Signal Isle, ocean (waves, wake, spray, reflections), sky, textures, favicon, fallback illustrations | Original, generated in code for this site (no imported models; the ship and characters are original designs, not replicas of any film or game) | Part of this repo |
 | Project screenshots | Arul's own project reports | Arul's own work |
 | Captain portrait (`static/portrait/captain.webp`, `captain-640.webp`) | AI-generated with CellCog from Arul's own photo; original costume, not based on any film character; metadata stripped | Arul's own likeness, used with permission |
 | Cinzel font | `@fontsource/cinzel` | SIL OFL 1.1 |

@@ -102,8 +102,9 @@ export function makeCaptain(m) {
 	const shirt = new THREE.MeshStandardMaterial({ color: '#d9cdb2', roughness: 0.9 });
 	const boots = new THREE.MeshStandardMaterial({ color: '#0f0b08', roughness: 0.5 });
 	const trousers = new THREE.MeshStandardMaterial({ color: '#2d2a26', roughness: 0.85 });
-	const skin = new THREE.MeshStandardMaterial({ color: '#b98663', roughness: 0.65 });
-	const beard = new THREE.MeshStandardMaterial({ color: '#8f8a83', roughness: 0.95 });
+	const skin = new THREE.MeshStandardMaterial({ color: '#8a5638', roughness: 0.6 });
+	const beard = new THREE.MeshStandardMaterial({ color: '#17110d', roughness: 0.95 });
+	const leather = new THREE.MeshStandardMaterial({ color: '#2a1a10', roughness: 0.55 });
 	const hatMat = new THREE.MeshStandardMaterial({ color: '#0d1320', roughness: 0.6, side: THREE.DoubleSide });
 	const glove = new THREE.MeshStandardMaterial({ color: '#2b1a10', roughness: 0.7 });
 
@@ -140,14 +141,25 @@ export function makeCaptain(m) {
 	const lining = new THREE.Mesh(new THREE.LatheGeometry(pts.slice(0, 3).map((p) => new THREE.Vector2(p.x - 0.01, p.y)), 24, -0.6, 1.2), coatLining);
 	lining.scale.set(0.8, 1, 1.05);
 	root.add(lining);
-	// waistcoat front, cravat, belt and buttons
-	const vest = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.2), new THREE.MeshStandardMaterial({ color: '#2a4a4e', roughness: 0.7 }));
-	vest.position.set(0.17, 1.15, 0);
-	root.add(vest);
-	const cravat = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 8), shirt);
-	cravat.rotation.z = Math.PI;
-	cravat.position.set(0.2, 1.36, 0);
-	root.add(cravat);
+	// open cream linen shirt under the greatcoat, collar points out
+	const shirtFront = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.2), shirt);
+	shirtFront.position.set(0.17, 1.15, 0);
+	root.add(shirtFront);
+	for (const s of [-1, 1]) {
+		const collar = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 3), shirt);
+		collar.rotation.set(s * 0.5, 0, Math.PI * 0.8);
+		collar.position.set(0.19, 1.43, s * 0.06);
+		root.add(collar);
+	}
+	// dark leather baldric from the left shoulder to the right hip, brass buckle
+	const baldric = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.78, 0.075), leather);
+	baldric.position.set(0.215, 1.17, 0.0);
+	baldric.rotation.x = -0.62;
+	root.add(baldric);
+	const bBuckle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.07, 0.09), m.brass);
+	bBuckle.position.set(0.235, 1.12, 0.03);
+	bBuckle.rotation.x = -0.62;
+	root.add(bBuckle);
 	const belt = new THREE.Mesh(new THREE.TorusGeometry(0.205, 0.022, 6, 24), new THREE.MeshStandardMaterial({ color: '#1a120c', roughness: 0.6 }));
 	belt.rotation.x = Math.PI / 2;
 	belt.scale.set(0.8, 1.05, 1);
@@ -163,14 +175,6 @@ export function makeCaptain(m) {
 			root.add(b);
 		}
 	}
-	// epaulettes
-	for (const s of [-1, 1]) {
-		const ep = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.brass);
-		ep.scale.set(1, 0.35, 1.2);
-		ep.position.set(0, 1.44, s * 0.22);
-		root.add(ep);
-	}
-
 	// head
 	const head = new THREE.Group();
 	head.position.set(0.02, 1.62, 0);
@@ -184,8 +188,9 @@ export function makeCaptain(m) {
 	nose.rotation.z = -Math.PI / 2;
 	nose.position.set(0.12, 0.0, 0);
 	head.add(nose);
-	const beardMesh = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.55), beard);
-	beardMesh.scale.set(1.05, 1.05, 1);
+	// trimmed beard along the jaw and chin
+	const beardMesh = new THREE.Mesh(new THREE.SphereGeometry(0.104, 16, 12, Math.PI * 0.5, Math.PI, Math.PI * 0.6, Math.PI * 0.4), beard);
+	beardMesh.scale.set(1.04, 1.06, 1.02);
 	beardMesh.position.set(0.02, -0.02, 0);
 	head.add(beardMesh);
 	const moustache = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 6, 12, Math.PI), beard);
@@ -201,16 +206,11 @@ export function makeCaptain(m) {
 		brow.rotation.x = s * 0.15;
 		head.add(brow);
 	}
-	// brass monocle-lens with a teal glass: the captain reads code too
-	const monocle = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.006, 6, 16), m.brass);
-	monocle.rotation.y = Math.PI / 2;
-	monocle.position.set(0.118, 0.035, 0.042);
-	head.add(monocle);
-	const lens = new THREE.Mesh(new THREE.CircleGeometry(0.022, 16), new THREE.MeshBasicMaterial({ color: '#5ad6c9', transparent: true, opacity: 0.55, toneMapped: false }));
-	lens.rotation.y = Math.PI / 2;
-	lens.position.set(0.12, 0.035, 0.042);
-	head.add(lens);
-
+	// short dark hair under the hat
+	const hair = new THREE.Mesh(new THREE.SphereGeometry(0.122, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), beard);
+	hair.scale.set(1.02, 1.1, 0.98);
+	hair.position.set(-0.01, 0.015, 0);
+	head.add(hair);
 	// bicorne hat worn fore-and-aft, with a teal plume
 	const hatShape = new THREE.Shape();
 	hatShape.moveTo(-0.24, 0);
@@ -219,9 +219,13 @@ export function makeCaptain(m) {
 	hatShape.quadraticCurveTo(0, 0.04, -0.24, 0);
 	const hatGeo = new THREE.ExtrudeGeometry(hatShape, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 2 });
 	hatGeo.translate(0, 0, -0.1);
+	const hatGroup = new THREE.Group();
+	hatGroup.rotation.y = Math.PI / 2; // worn side-to-side, as in Arul's portrait
+	hatGroup.position.y = -0.005;
+	head.add(hatGroup);
 	const hat = new THREE.Mesh(hatGeo, hatMat);
 	hat.position.set(0, 0.08, 0);
-	head.add(hat);
+	hatGroup.add(hat);
 	const trimPts = [];
 	for (let i = 0; i <= 24; i++) {
 		const u = i / 24;
@@ -230,17 +234,22 @@ export function makeCaptain(m) {
 		trimPts.push(new THREE.Vector3(x, y + 0.09, 0.115));
 	}
 	const trim = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(trimPts), 32, 0.007, 5), m.brass);
-	head.add(trim);
+	hatGroup.add(trim);
 	const trim2 = trim.clone();
 	trim2.position.z = -0.23;
-	head.add(trim2);
-	const cockade = new THREE.Mesh(new THREE.CircleGeometry(0.03, 16), m.teal);
-	cockade.position.set(0.04, 0.18, 0.118);
-	head.add(cockade);
-	const plume = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.22, 8), new THREE.MeshStandardMaterial({ color: '#2f8f87', roughness: 0.9 }));
-	plume.rotation.z = -0.9;
-	plume.position.set(-0.1, 0.24, 0);
-	head.add(plume);
+	hatGroup.add(trim2);
+	const cockade = new THREE.Mesh(new THREE.CircleGeometry(0.028, 16), m.brass);
+	cockade.position.set(0.1, 0.17, 0.118);
+	hatGroup.add(cockade);
+	// a small teal feather plume tucked behind the cockade
+	const plumeMat = new THREE.MeshStandardMaterial({ color: '#1f6f6a', roughness: 0.85, emissive: '#0d3431' });
+	for (let i = 0; i < 3; i++) {
+		const f = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.2 - i * 0.03, 6), plumeMat);
+		f.scale.z = 0.4;
+		f.rotation.set(0, 0, -0.5 - i * 0.25);
+		f.position.set(0.13 + i * 0.015, 0.25 - i * 0.015, 0.11);
+		hatGroup.add(f);
+	}
 	root.add(head);
 
 	// arms: shoulder → elbow → hand, solved each frame toward the wheel
@@ -258,8 +267,12 @@ export function makeCaptain(m) {
 	});
 
 	const elbow = new THREE.Vector3();
-	/** @param {THREE.Vector3[]} targets hand targets in the captain's local space */
-	function reach(targets) {
+	/**
+	 * @param {THREE.Vector3[]} targets hand targets in the captain's local space
+	 * @param {(THREE.Vector3|null)[]} [hints] optional elbow positions (local), e.g. raised for a salute
+	 * @param {number[]} [hintW] 0..1 blend toward each hint
+	 */
+	function reach(targets, hints = [], hintW = []) {
 		for (const [i, arm] of arms.entries()) {
 			const t = targets[i];
 			const sh = arm.shoulder;
@@ -269,7 +282,9 @@ export function makeCaptain(m) {
 			const d = sh.distanceTo(t);
 			const mid = new THREE.Vector3().addVectors(sh, t).multiplyScalar(0.5);
 			const bend = Math.sqrt(Math.max(0, (L1 + L2) * (L1 + L2) / 4 - (d * d) / 4));
-			elbow.copy(mid).add(new THREE.Vector3(-0.05, -bend, arm.s * bend * 0.6));
+			elbow.copy(mid).addScaledVector(new THREE.Vector3(-0.05, -1, arm.s * 0.6).normalize(), bend * 1.17);
+			// a hint is an explicit elbow position (e.g. raised out to the side for a salute)
+			if (hints[i] && hintW[i]) elbow.lerp(hints[i], hintW[i]);
 			span(arm.upper, sh, elbow);
 			span(arm.lower, elbow, t);
 			arm.cuff.position.copy(elbow).lerp(t, 0.82);
@@ -310,6 +325,16 @@ function blob(ctx, cx, cy, r, seed) {
 	ctx.closePath();
 }
 
+/** Island positions on the chart, in map-texture pixels (1024 × 704), laid out as a voyage left → right. */
+export const MAP_SPOTS = [
+	[150, 470],
+	[300, 230],
+	[470, 450],
+	[620, 210],
+	[770, 430],
+	[890, 220]
+];
+
 /**
  * @param {{ title: string }[]} destinations
  */
@@ -324,15 +349,7 @@ export function makeMapTexture(destinations) {
 	tex.colorSpace = THREE.SRGBColorSpace;
 	tex.anisotropy = 8;
 
-	// fixed island positions, laid out as a voyage left → right
-	const spots = [
-		[150, 470],
-		[300, 230],
-		[470, 450],
-		[620, 210],
-		[770, 430],
-		[890, 220]
-	].slice(0, destinations.length);
+	const spots = MAP_SPOTS.slice(0, destinations.length);
 
 	// static layer (parchment, coasts, rose) drawn once
 	const base = document.createElement('canvas');
@@ -780,7 +797,9 @@ export function makeChartTable(m, destinations) {
 	light.position.set(-0.4, topY + 0.6, -0.42);
 	root.add(light);
 
-	return { root, map, needle, compass, scope, book, light, flame, topY };
+	/** chart pixel → table-local position on the map surface */
+	const spotToLocal = (x, y) => new THREE.Vector3(-0.1 + (x / 1024 - 0.5) * mapW, topY + 0.04, (y / 704 - 0.5) * mapH);
+	return { root, map, needle, compass, scope, book, light, flame, topY, spotToLocal };
 }
 
 /* ------------------------------------------------------------------ */
