@@ -3,6 +3,34 @@
 	import { reveal } from '$lib/actions.js';
 	import RouteMap from './RouteMap.svelte';
 	import CaseStudy from './CaseStudy.svelte';
+	import { setFocus } from '$lib/scene/bus.js';
+	import { onMount } from 'svelte';
+
+	/** @type {HTMLOListElement} */
+	let list;
+	// highlight the matching island on the 3D chart for the card nearest the middle of the screen
+	onMount(() => {
+		const cards = Array.from(list.querySelectorAll(':scope > li'));
+		const seen = new Map();
+		const io = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) seen.set(e.target, e.isIntersecting ? e.intersectionRect.height : 0);
+				let best = -1,
+					bestH = 0;
+				cards.forEach((c, i) => {
+					const h = seen.get(c) ?? 0;
+					if (h > bestH) {
+						best = i;
+						bestH = h;
+					}
+				});
+				setFocus({ project: best });
+			},
+			{ rootMargin: '-30% 0px -30% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] }
+		);
+		cards.forEach((c) => io.observe(c));
+		return () => io.disconnect();
+	});
 
 	/** @type {any} */
 	let selected = $state(null);
@@ -23,15 +51,15 @@
 <section id="projects" class="section projects" aria-labelledby="projects-title">
 	<div class="container">
 		<header class="section-head reveal" use:reveal>
-			<p class="eyebrow">Log 01 · The voyage log</p>
+			<p class="eyebrow">Log 03 · Map destinations</p>
 			<h2 id="projects-title" class="section-title">Projects</h2>
 			<p class="section-lede">
-				Full-stack apps built and shipped in 2026. Open any entry for the mission file: the goal, users,
-				Arul’s role, features, architecture and where each detail comes from.
+				Full-stack apps built and shipped in 2026, each one a destination on the chart. Open any entry for the
+				mission file: the goal, users, Arul’s role, features, architecture and where each detail comes from.
 			</p>
 		</header>
 
-		<ol class="grid">
+		<ol class="grid" bind:this={list}>
 			{#each projects as p, i}
 				<li class="card reveal" use:reveal style="--d:{(i % 2) * 90}ms">
 					<div class="cover">
@@ -104,6 +132,22 @@
 <CaseStudy project={selected} onclose={closed} />
 
 <style>
+	:global(html.scene-live) .projects::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: linear-gradient(90deg, rgba(5, 10, 20, 0.55) 0%, rgba(5, 10, 20, 0.2) 60%), linear-gradient(180deg, rgba(5, 10, 20, 0.45) 0%, rgba(5, 10, 20, 0.66) 30%, rgba(5, 10, 20, 0.66) 85%, rgba(5, 10, 20, 0.3) 100%);
+	}
+	.projects .container {
+		position: relative;
+	}
+	:global(html.scene-live) .projects .section-head {
+		text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8);
+	}
+	:global(html.scene-live) .projects .log {
+		background: rgba(6, 12, 22, 0.86);
+	}
 	.projects {
 		background:
 			radial-gradient(80% 60% at 85% 0%, rgba(90, 214, 201, 0.06), transparent 60%),

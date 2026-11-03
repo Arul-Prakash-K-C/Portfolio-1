@@ -283,3 +283,85 @@ button {
 		transform: none;
 	}
 }
+
+/* ------------------------------------------------------------------
+   Voyage layout: content panels on the left, the 3D stage on the right
+------------------------------------------------------------------- */
+main,
+.footer {
+	position: relative;
+	z-index: 1;
+}
+
+.stage-section {
+	min-height: 100svh;
+	display: flex;
+	align-items: center;
+}
+.split {
+	display: grid;
+	grid-template-columns: minmax(0, 640px) 1fr;
+	gap: clamp(24px, 5vw, 64px);
+	align-items: center;
+}
+.panel {
+	position: relative;
+	padding: clamp(22px, 3.2vw, 38px);
+	border-radius: 20px;
+	border: 1px solid var(--line);
+	background: rgba(10, 20, 36, 0.55);
+}
+.panel .section-head {
+	margin-bottom: 24px;
+}
+.art-fallback {
+	margin: 0;
+	display: grid;
+	place-items: center;
+	opacity: 0.55;
+}
+
+/* When the 3D voyage is running, sections become windows onto it. */
+html.scene-live .section {
+	background: transparent !important;
+	border-top-color: transparent !important;
+}
+html.scene-live .stage-section::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(90deg, rgba(5, 10, 20, 0.72) 0%, rgba(5, 10, 20, 0.35) 46%, rgba(5, 10, 20, 0) 70%);
+}
+html.scene-live .panel {
+	background: rgba(6, 12, 22, 0.72);
+	backdrop-filter: blur(10px) saturate(1.1);
+	-webkit-backdrop-filter: blur(10px) saturate(1.1);
+	border-color: rgba(239, 228, 204, 0.14);
+	box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+html.scene-live .section-head {
+	text-shadow: 0 2px 16px rgba(0, 0, 0, 0.85);
+}
+html.scene-live .art-fallback {
+	visibility: hidden;
+}
+
+@media (max-width: 900px) {
+	.split {
+		grid-template-columns: 1fr;
+	}
+	.art-fallback {
+		display: none;
+	}
+	.stage-section {
+		min-height: 0;
+	}
+	/* phones with the 3D voyage: leave a window above each panel for the scene */
+	html.scene-live .stage-section {
+		padding-top: 46svh;
+	}
+	html.scene-live .stage-section::before {
+		background: linear-gradient(180deg, rgba(5, 10, 20, 0) 26%, rgba(5, 10, 20, 0.88) 44%, rgba(5, 10, 20, 0.88) 100%);
+	}
+}

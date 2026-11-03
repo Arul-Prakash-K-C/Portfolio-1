@@ -1,16 +1,18 @@
 <script>
-	import SceneHost from './SceneHost.svelte';
+	import HeroFallback from './HeroFallback.svelte';
 	import { profile, experience } from '$lib/data/profile.js';
 	import { projects } from '$lib/data/projects.js';
 
-	/** @type {HTMLElement} */
-	let heroEl = $state();
 	const current = experience[0];
 	const liveCount = projects.filter((p) => p.live).length;
 </script>
 
-<section id="home" class="hero" bind:this={heroEl} aria-labelledby="hero-title">
-	<SceneHost {heroEl} />
+<section id="home" class="hero" aria-labelledby="hero-title">
+	<!-- illustrated backdrop: shown until (or instead of) the live 3D voyage -->
+	<div class="backdrop" aria-hidden="true">
+		<div class="art"><HeroFallback /></div>
+		<div class="veil"></div>
+	</div>
 
 	<div class="content container">
 		<p class="eyebrow rise" style="--i:0">Captain’s log · {profile.location}</p>
@@ -49,8 +51,8 @@
 		</dl>
 	</div>
 
-	<a class="scroll-cue" href="#projects">
-		<span class="sr-only">Skip to projects</span>
+	<a class="scroll-cue" href="#about">
+		<span class="sr-only">Continue the voyage: About</span>
 		<span class="mouse" aria-hidden="true"><span></span></span>
 		<span class="cue-text" aria-hidden="true">Set sail</span>
 	</a>
@@ -65,6 +67,37 @@
 		align-items: center;
 		overflow: hidden;
 		isolation: isolate;
+	}
+	.backdrop {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		background: #050a14;
+		transition: background 1.2s var(--ease-out);
+	}
+	.art {
+		position: absolute;
+		inset: 0;
+		transition: opacity 1.2s var(--ease-out);
+	}
+	:global(html.scene-live) .backdrop {
+		background: transparent;
+	}
+	:global(html.scene-live) .art {
+		opacity: 0;
+	}
+	/* readability veil: darkens the side where the text sits, and fades into the next section */
+	.veil {
+		position: absolute;
+		inset: 0;
+		background:
+			linear-gradient(90deg, rgba(6, 11, 21, 0.82) 0%, rgba(6, 11, 21, 0.45) 42%, rgba(6, 11, 21, 0) 68%),
+			linear-gradient(180deg, rgba(6, 11, 21, 0) 70%, rgba(6, 11, 21, 0.55) 100%);
+	}
+	@media (max-width: 860px) {
+		.veil {
+			background: linear-gradient(180deg, rgba(6, 11, 21, 0.3) 0%, rgba(6, 11, 21, 0.8) 52%, rgba(6, 11, 21, 0.6) 100%);
+		}
 	}
 	.content {
 		position: relative;

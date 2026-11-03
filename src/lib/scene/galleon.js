@@ -469,7 +469,7 @@ function makeFigurehead(brass, teal) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Robot crew member (kept from the original scene, now at the helm)   */
+/* Robot crew member: the ship's engineer and navigator              */
 /* ------------------------------------------------------------------ */
 function makeTerminalTexture() {
 	const c = document.createElement('canvas');
@@ -583,8 +583,9 @@ export function makeGalleon() {
 	const qd = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 2.9), deckMat);
 	qd.position.set(-L / 2 + 1.75, 1.25, 0);
 	ship.add(qd);
-	const poop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 2.4), deckMat);
-	poop.position.set(-L / 2 + 0.85, 1.95, 0);
+	// a short poop deck right at the stern, leaving the quarterdeck clear for the helm
+	const poop = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.06, 2.2), deckMat);
+	poop.position.set(-L / 2 + 0.3, 1.95, 0);
 	ship.add(poop);
 	// bulkhead below the quarterdeck, with lit doors
 	const bulk = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.75, 2.9), darkWood);
@@ -984,25 +985,9 @@ export function makeGalleon() {
 	ship.add(pennant);
 
 	/* deck dressing: helm, capstan, hatch, barrels, crates */
-	const helm = new THREE.Group();
-	const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 8, 24), spar);
-	helm.add(wheel);
-	for (let i = 0; i < 8; i++) {
-		const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.84, 5), spar);
-		spoke.rotation.z = (i / 8) * Math.PI;
-		helm.add(spoke);
-	}
-	const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.1, 10), brass);
-	hub.rotation.x = Math.PI / 2;
-	helm.add(hub);
-	helm.rotation.y = Math.PI / 2;
-	helm.position.set(-L / 2 + 2.6, 1.75, 0);
-	ship.add(helm);
-	const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.2), darkWood);
-	pedestal.position.set(-L / 2 + 2.6, 1.5, 0);
-	ship.add(pedestal);
+	// the ship's wheel and the captain are added by the voyage scene (props.js)
 	const capstan = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.55, 12), darkWood);
-	capstan.position.set(-1.4, deckY + 0.3, 0);
+	capstan.position.set(1.0, deckY + 0.3, 0.35);
 	ship.add(capstan);
 	const hatch = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.0), darkWood);
 	hatch.position.set(1.8, deckY + 0.08, 0);
@@ -1033,15 +1018,10 @@ export function makeGalleon() {
 	crate.rotation.y = 0.4;
 	ship.add(crate);
 
-	/* the robot crew member, at the helm on the quarterdeck */
+	/* the robot crew member; the voyage scene stations it at the chart table */
 	const robot = makeRobot(brass, teal);
-	robot.group.position.set(-L / 2 + 2.15, 1.28, 0.45);
-	robot.group.rotation.y = Math.PI / 2 + 0.5;
-	robot.group.scale.setScalar(0.62);
+	robot.group.scale.setScalar(0.85);
 	ship.add(robot.group);
-	const consoleLight = new THREE.PointLight('#5ad6c9', 2.5, 3.5, 2);
-	consoleLight.position.set(-L / 2 + 2.6, 2.2, 0.9);
-	ship.add(consoleLight);
 
 	return {
 		ship,
