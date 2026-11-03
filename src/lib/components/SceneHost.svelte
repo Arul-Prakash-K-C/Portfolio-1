@@ -219,7 +219,9 @@
 	{:else if mode === 'failed'}
 		<span class="ctrl status" role="status">3D scene unavailable, showing the illustrated version</span>
 	{:else if offerLoad}
-		<button class="ctrl" type="button" onclick={load}>Load 3D voyage</button>
+		<button class="ctrl load" type="button" onclick={load} aria-label="Load 3D voyage">
+			<span class="long" aria-hidden="true">Load 3D voyage</span><span class="short" aria-hidden="true">3D</span>
+		</button>
 	{/if}
 </div>
 
@@ -314,6 +316,15 @@
 		.status {
 			display: none;
 		}
+		.load .long {
+			display: none;
+		}
+		.load .short {
+			display: inline;
+		}
+	}
+	.load .short {
+		display: none;
 	}
 	@media print {
 		.stage,

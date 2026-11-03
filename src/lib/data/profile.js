@@ -22,6 +22,13 @@ export const profile = {
 	email: '', // e.g. 'name@example.com'
 	phone: '', // e.g. '+91 90000 00000'
 
+	// Supplied by Arul (Nov 2026). Set to null to hide the portrait.
+	portrait: {
+		src: '/portrait/arul.webp',
+		srcSmall: '/portrait/arul-320.webp',
+		alt: 'Arul Prakash K C in a navy blazer and white shirt, smiling, under the trees on campus.'
+	},
+
 	// Put the résumé at static/resume.pdf and set this to '/resume.pdf'.
 	resumeUrl: '',
 

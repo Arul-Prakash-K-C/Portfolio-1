@@ -1,5 +1,5 @@
 <script>
-	import { about, education, experience } from '$lib/data/profile.js';
+	import { about, education, experience, profile } from '$lib/data/profile.js';
 	import { reveal } from '$lib/actions.js';
 
 	const current = experience[0];
@@ -8,10 +8,26 @@
 <section id="about" class="section stage-section about" aria-labelledby="about-title">
 	<div class="container split">
 		<div class="panel reveal" use:reveal>
-			<header class="section-head">
-				<p class="eyebrow">Log 01 · The captain at the wheel</p>
-				<h2 id="about-title" class="section-title">About</h2>
-			</header>
+			<div class="intro-head">
+				<header class="section-head">
+					<p class="eyebrow">Log 01 · The captain at the wheel</p>
+					<h2 id="about-title" class="section-title">About</h2>
+				</header>
+				{#if profile.portrait}
+					<figure class="portrait">
+						<img
+							src={profile.portrait.srcSmall}
+							srcset={`${profile.portrait.srcSmall} 320w, ${profile.portrait.src} 640w`}
+							sizes="(max-width: 520px) 140px, 180px"
+							alt={profile.portrait.alt}
+							width="320"
+							height="400"
+							loading="lazy"
+							decoding="async"
+						/>
+					</figure>
+				{/if}
+			</div>
 			{#each about as para}
 				<p class="para">{para}</p>
 			{/each}
@@ -56,6 +72,55 @@
 	.about {
 		background: var(--navy);
 		border-top: 1px solid var(--line);
+	}
+	.intro-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 20px;
+	}
+	/* brass-framed portrait with a light moonlit grade; the photo itself is unaltered */
+	.portrait {
+		position: relative;
+		flex: none;
+		width: 180px;
+		margin: 0 0 18px;
+		padding: 6px;
+		border-radius: 14px;
+		background: linear-gradient(145deg, #f0c470, #8a6224 55%, #d9a84e);
+		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+		transform: rotate(1.5deg);
+		transition: transform var(--t-med) var(--ease-out);
+	}
+	.portrait:hover {
+		transform: rotate(0deg) translateY(-2px);
+	}
+	.portrait img {
+		width: 100%;
+		height: auto;
+		aspect-ratio: 4 / 5;
+		object-fit: cover;
+		border-radius: 9px;
+		filter: contrast(1.05) saturate(0.92);
+	}
+	.portrait::after {
+		content: '';
+		position: absolute;
+		inset: 6px;
+		border-radius: 9px;
+		pointer-events: none;
+		background:
+			radial-gradient(120% 90% at 50% 30%, transparent 55%, rgba(5, 10, 20, 0.45) 100%),
+			linear-gradient(160deg, rgba(90, 214, 201, 0.12), rgba(217, 168, 78, 0.1));
+		mix-blend-mode: soft-light;
+	}
+	@media (max-width: 520px) {
+		.intro-head {
+			flex-direction: column-reverse;
+		}
+		.portrait {
+			width: 140px;
+		}
 	}
 	.para {
 		color: var(--parchment-2);
