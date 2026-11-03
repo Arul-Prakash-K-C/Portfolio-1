@@ -1,6 +1,7 @@
 <script>
 	import { about, education, experience, profile } from '$lib/data/profile.js';
 	import { reveal } from '$lib/actions.js';
+	import CaptainPortrait from './CaptainPortrait.svelte';
 
 	const current = experience[0];
 </script>
@@ -52,6 +53,9 @@
 			</dl>
 		</div>
 
+		{#if profile.captainPortrait}
+			<CaptainPortrait {...profile.captainPortrait} />
+		{:else}
 		<!-- 2D stand-in for the 3D captain and wheel when the scene is off -->
 		<figure class="art-fallback" aria-hidden="true">
 			<svg viewBox="0 0 200 200" width="260" height="260">
@@ -65,6 +69,7 @@
 				<circle cx="100" cy="100" r="10" fill="#5ad6c9" />
 			</svg>
 		</figure>
+		{/if}
 	</div>
 </section>
 
