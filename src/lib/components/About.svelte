@@ -6,7 +6,12 @@
 	const current = experience[0];
 </script>
 
-<section id="about" class="section stage-section about" aria-labelledby="about-title">
+<section id="about" class="section stage-section about" aria-labelledby="about-title" data-stage-offset="0.04">
+	<!-- With the 3D voyage on, the section opens on a clear shot of the captain at the wheel:
+	     the captain turns to camera, salutes, and goes back to steering before the log scrolls up. -->
+	<div class="stage-window" aria-hidden="true">
+		<p class="stage-cue">The captain salutes · then back to the wheel</p>
+	</div>
 	<div class="container split">
 		<div class="panel reveal" use:reveal>
 			<div class="intro-head">
@@ -77,6 +82,41 @@
 	.about {
 		background: var(--navy);
 		border-top: 1px solid var(--line);
+	}
+	.stage-window {
+		display: none;
+	}
+	:global(html.scene-live) .about {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	:global(html.scene-live) .about .stage-window {
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		height: 86svh;
+		position: relative;
+		z-index: 1;
+	}
+	.stage-cue {
+		padding: 0 16px;
+		text-align: center;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--parchment-2);
+		opacity: 0.75;
+		text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+		margin: 0 0 18px;
+	}
+	@media (max-width: 759px) {
+		:global(html.scene-live) .about {
+			padding-top: 0;
+		}
+		:global(html.scene-live) .about .stage-window {
+			height: 72svh;
+		}
 	}
 	.intro-head {
 		display: flex;

@@ -7,7 +7,7 @@
 /** @type {Set<(f: Record<string, number>) => void>} */
 const listeners = new Set();
 /** @type {Record<string, number>} */
-const state = { skill: 0, project: -1, projectsFrac: 0 };
+const state = { skill: 0, project: -1, projectsFrac: 0, port: -1 };
 
 /** @param {Record<string, number>} patch */
 export function setFocus(patch) {
