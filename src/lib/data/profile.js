@@ -29,12 +29,13 @@ export const profile = {
 		alt: 'Arul Prakash K C in a navy blazer and white shirt, smiling, under the trees on campus.'
 	},
 
-	// Pirate-captain portrait for the About stage (generated from Arul's own photo).
-	// Save it as static/portrait/captain.webp (+ captain-640.webp) and fill this in, e.g.
-	// { src: '/portrait/captain.webp', srcSmall: '/portrait/captain-640.webp',
-	//   alt: 'Arul Prakash K C as a sea captain in a navy greatcoat on a moonlit deck.',
-	//   caption: 'Captain of the Night Compiler' }
-	captainPortrait: null,
+	// Pirate-captain portrait for the About stage (AI-generated from Arul's own photo).
+	captainPortrait: {
+		src: '/portrait/captain.webp',
+		srcSmall: '/portrait/captain-640.webp',
+		alt: 'Arul Prakash K C as a sea captain in a navy greatcoat on a moonlit deck.',
+		caption: 'Captain of the Night Compiler'
+	},
 
 	// Put the résumé at static/resume.pdf and set this to '/resume.pdf'.
 	resumeUrl: '',
