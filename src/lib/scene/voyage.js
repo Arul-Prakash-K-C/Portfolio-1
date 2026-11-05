@@ -110,10 +110,11 @@ function makeOcean(segments) {
         float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
         vec3 body = mix(uDeep, uShallow, clamp(vCrest * 2.2, 0.0, 1.0) * 0.6);
         vec3 col = mix(body, uSky, fres * 0.75);
-        // moon glitter path + broad sheen
+        // Keep moon highlights as broken, local ripples instead of a continuous white trail.
         vec3 r = reflect(-v, n);
         float md = max(dot(r, uMoonDir), 0.0);
-        col += uMoonCol * (pow(md, 400.0) * 3.5 + pow(md, 40.0) * 0.35 + pow(md, 6.0) * 0.05);
+        float sparkle = step(0.985, noise(vWorld.xz * 0.72 + vec2(uTime * 0.11, -uTime * 0.07)));
+        col += uMoonCol * (pow(md, 180.0) * 0.7 + pow(md, 38.0) * sparkle * 0.16);
         // warm lantern reflection from the ship
         vec3 ld = normalize(uLantern - vWorld);
         float lr = pow(max(dot(r, ld), 0.0), 120.0);
@@ -134,6 +135,70 @@ function makeOcean(segments) {
       }`
 	});
 	return { mesh: new THREE.Mesh(geo, mat), mat };
+}
+
+/**
+ * A broken V wake attached to the moving hull. The two diverging foam shoulders
+ * begin at the bow, soften behind the stern, and inherit the ocean's wave height.
+ */
+function makeWake(ship) {
+	const geometry = new THREE.PlaneGeometry(26, 16, 112, 72);
+	geometry.rotateX(-Math.PI / 2);
+	const position = geometry.attributes.position;
+	for (let i = 0; i < position.count; i++) position.setX(i, position.getX(i) - 7);
+	position.needsUpdate = true;
+	geometry.computeVertexNormals();
+	const material = new THREE.ShaderMaterial({
+		transparent: true,
+		depthWrite: false,
+		side: THREE.DoubleSide,
+		uniforms: { uTime: { value: 0 } },
+		vertexShader: /* glsl */ `
+			uniform float uTime;
+			varying vec2 vLocal;
+			varying vec3 vWorld;
+			float oceanY(vec2 p) {
+				return sin(dot(normalize(vec2(1.0,.25)),p)*.3927-uTime*.66)*.56
+				 + sin(dot(normalize(vec2(.6,.8)),p)*.6981-uTime*.54)*.26
+				 + sin(dot(normalize(vec2(-.3,1.0)),p)*1.1424-uTime*.43)*.12;
+			}
+			void main(){
+				vLocal = position.xz;
+				vec4 world = modelMatrix * vec4(position, 1.0);
+				world.y += oceanY(world.xz) + .045;
+				vWorld = world.xyz;
+				gl_Position = projectionMatrix * viewMatrix * world;
+			}`,
+		fragmentShader: /* glsl */ `
+			uniform float uTime;
+			varying vec2 vLocal;
+			varying vec3 vWorld;
+			float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+			float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+				return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y); }
+			void main(){
+				float aft = clamp((6.2-vLocal.x)/20.5,0.,1.);
+				float ends = smoothstep(0.,.07,aft)*(1.-smoothstep(.82,1.,aft));
+				float halfWidth = .85 + aft*4.7;
+				float broken = noise(vLocal*vec2(2.6,4.2)+vec2(-uTime*.34,uTime*.19));
+				float grain = noise(vLocal*vec2(7.0,10.0)+vec2(-uTime*.55,uTime*.36));
+				float shoulder = exp(-pow((abs(vLocal.y)-halfWidth)/(.22+aft*.36),2.));
+				float bowSplit = exp(-pow((vLocal.x-5.5)/.7,2.))*exp(-pow((abs(vLocal.y)-.93)/.42,2.));
+				float hullShear = exp(-pow((abs(vLocal.y)-.92)/.23,2.))*smoothstep(-5.4,-2.2,vLocal.x);
+				float sternChurn = exp(-pow((vLocal.x+6.2)/2.1,2.))*exp(-pow(vLocal.y/1.3,2.));
+				float fleck = smoothstep(.36,.8,grain);
+				float breakup = mix(.28,1.,smoothstep(.18,.75,broken));
+				float alpha = (shoulder*.42*ends*mix(.42,1.,fleck) + bowSplit*.43 + hullShear*.16 + sternChurn*.2*mix(.45,1.,broken))*breakup;
+				alpha *= smoothstep(.02,.22,grain);
+				vec3 foam = mix(vec3(.36,.48,.55),vec3(.78,.82,.79),smoothstep(.42,.88,grain));
+				gl_FragColor = vec4(foam, clamp(alpha,0.,.52));
+			}`
+	});
+	// The foam is a close surface treatment, not a long white stripe on the sea.
+	const mesh = new THREE.Mesh(geometry, material);
+	mesh.renderOrder = 1;
+	ship.add(mesh);
+	return { mesh, mat: material };
 }
 
 /* ------------------------------------------------------------------ */
@@ -386,7 +451,8 @@ export function createVoyage(canvas, opts = {}) {
 		alpha: false,
 		powerPreference: 'high-performance'
 	});
-	const dpr = Math.min(window.devicePixelRatio || 1, low ? 1.25 : 1.5);
+	// High-density displays can render up to 3840×2160 at a 1920×1080 viewport.
+	const dpr = Math.min(window.devicePixelRatio || 1, low ? 1.25 : 2);
 	renderer.setPixelRatio(dpr);
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -434,6 +500,7 @@ export function createVoyage(canvas, opts = {}) {
 	ship.position.set(10.5, 0, -11);
 	ship.rotation.y = -0.32;
 	scene.add(ship);
+	const wake = makeWake(ship);
 	const lanternWorld = new THREE.Vector3();
 
 	/* post-processing (desktop / capable devices only) */
@@ -496,6 +563,7 @@ export function createVoyage(canvas, opts = {}) {
 		pys += (py - pys) * Math.min(1, dt * 2.5);
 
 		ocean.mat.uniforms.uTime.value = time;
+		wake.mat.uniforms.uTime.value = time;
 		sky.mat.uniforms.uTime.value = time;
 		stars.mat.uniforms.uTime.value = time;
 		motes.mat.uniforms.uTime.value = time;
@@ -527,9 +595,8 @@ export function createVoyage(canvas, opts = {}) {
 		}
 		fp.needsUpdate = true;
 
-		g.robot.armR.rotation.z = -1.1 + Math.sin(time * 3) * 0.35;
-		g.robot.tip.visible = Math.sin(time * 4) > -0.6;
-		g.robot.term.update(time);
+		g.captain.sprite.position.y = g.captain.baseY + Math.sin(time * 1.25) * 0.025;
+		g.captain.sprite.rotation.z = Math.sin(time * 0.72) * 0.008;
 		g.lanternLight.intensity = 8.5 + Math.sin(time * 7) * 0.6 + Math.sin(time * 13) * 0.35;
 		g.lanternLight.getWorldPosition(lanternWorld);
 		ocean.mat.uniforms.uLantern.value.copy(lanternWorld);
@@ -606,6 +673,7 @@ export function createVoyage(canvas, opts = {}) {
 		dispose() {
 			this.stop();
 			scene.traverse((o) => {
+				if (o === g.captain.sprite) return;
 				if (o.geometry) o.geometry.dispose();
 				if (o.material) {
 					const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -615,6 +683,7 @@ export function createVoyage(canvas, opts = {}) {
 					}
 				}
 			});
+			g.captain.dispose();
 			composer?.dispose?.();
 			renderer.dispose();
 		}

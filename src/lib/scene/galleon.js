@@ -4,11 +4,12 @@
  *
  * Generic age-of-sail anatomy (lofted hull, stern castle, three masts,
  * square rig, rigging), with an identity of its own: weathered umber wood,
- * brass trim, ash-grey patched canvas, a brass automaton figurehead and a
- * compass-and-gear pennant. Every mesh and texture is generated here; no
- * external models or images are used.
+ * brass trim, ash-grey patched canvas and a compass-and-gear pennant.
+ * The captain is a high-detail transparent character render animated from
+ * a consistent five-pose sheet.
  */
 import * as THREE from 'three';
+import { makePirateSprite } from './pirateSprite.js';
 
 /* ------------------------------------------------------------------ */
 /* Seeded random so the ship looks the same on every visit             */
@@ -469,89 +470,6 @@ function makeFigurehead(brass, teal) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Robot crew member (kept from the original scene, now at the helm)   */
-/* ------------------------------------------------------------------ */
-function makeTerminalTexture() {
-	const c = document.createElement('canvas');
-	c.width = 128;
-	c.height = 64;
-	const tex = new THREE.CanvasTexture(c);
-	tex.colorSpace = THREE.SRGBColorSpace;
-	const ctx = c.getContext('2d');
-	const lines = ['> plot --course', '> git push', '> npm run sail', '> ok ✓'];
-	let tick = -1;
-	let blinkOn = null;
-	function draw(blink) {
-		ctx.fillStyle = '#04151a';
-		ctx.fillRect(0, 0, 128, 64);
-		ctx.font = 'bold 11px monospace';
-		ctx.fillStyle = '#5ad6c9';
-		for (let i = 0; i < 3; i++) ctx.fillText(lines[(tick + i) % lines.length], 8, 18 + i * 15);
-		if (blink) ctx.fillRect(8, 52, 7, 3);
-		tex.needsUpdate = true;
-	}
-	return {
-		tex,
-		update(t) {
-			const nt = Math.floor(t / 1.6);
-			const blink = Math.floor(t * 2) % 2 === 0;
-			if (nt !== tick || blink !== blinkOn) {
-				tick = Math.max(nt, 0);
-				blinkOn = blink;
-				draw(blink);
-			}
-		}
-	};
-}
-
-function makeRobot(brass, teal) {
-	const g = new THREE.Group();
-	const metal = new THREE.MeshStandardMaterial({ color: '#97a1b0', metalness: 0.8, roughness: 0.32 });
-	const dark = new THREE.MeshStandardMaterial({ color: '#1b2230', metalness: 0.4, roughness: 0.6 });
-	const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.55, 16), metal);
-	body.position.y = 0.55;
-	const belt = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 8, 24), brass);
-	belt.rotation.x = Math.PI / 2;
-	belt.position.y = 0.36;
-	const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.44), metal);
-	head.position.y = 1.04;
-	const term = makeTerminalTexture();
-	const visor = new THREE.Mesh(
-		new THREE.PlaneGeometry(0.48, 0.24),
-		new THREE.MeshBasicMaterial({ map: term.tex, toneMapped: false })
-	);
-	visor.position.set(0, 1.05, 0.225);
-	const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), teal);
-	eye.position.set(0.31, 1.1, 0.1);
-	const tip = new THREE.Mesh(
-		new THREE.SphereGeometry(0.04, 10, 10),
-		new THREE.MeshBasicMaterial({ color: '#ffcf7a', toneMapped: false })
-	);
-	tip.position.set(-0.14, 1.52, 0);
-	const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 6), brass);
-	antenna.position.set(-0.14, 1.36, 0);
-	const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.035, 3), dark);
-	hat.position.y = 1.27;
-	hat.rotation.y = Math.PI / 6;
-	const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.25, 0.15, 12), dark);
-	crown.position.y = 1.36;
-	const armGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.42, 8);
-	const armL = new THREE.Mesh(armGeo, metal);
-	armL.position.set(-0.34, 0.6, 0.05);
-	armL.rotation.z = 0.35;
-	const armR = new THREE.Mesh(armGeo, metal);
-	armR.position.set(0.34, 0.72, 0.08);
-	armR.rotation.z = -1.1;
-	const legGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.3, 8);
-	const legL = new THREE.Mesh(legGeo, dark);
-	legL.position.set(-0.11, 0.15, 0);
-	const legR = legL.clone();
-	legR.position.x = 0.11;
-	g.add(body, belt, head, visor, eye, antenna, tip, hat, crown, armL, armR, legL, legR);
-	return { group: g, term, armR, tip };
-}
-
-/* ------------------------------------------------------------------ */
 /* Assemble                                                            */
 /* ------------------------------------------------------------------ */
 export function makeGalleon() {
@@ -997,9 +915,12 @@ export function makeGalleon() {
 	helm.add(hub);
 	helm.rotation.y = Math.PI / 2;
 	helm.position.set(-L / 2 + 2.6, 1.75, 0);
+	// The supplied captain render includes the wheel and pedestal in its first pose.
+	helm.visible = false;
 	ship.add(helm);
 	const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.2), darkWood);
 	pedestal.position.set(-L / 2 + 2.6, 1.5, 0);
+	pedestal.visible = false;
 	ship.add(pedestal);
 	const capstan = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.55, 12), darkWood);
 	capstan.position.set(-1.4, deckY + 0.3, 0);
@@ -1033,13 +954,13 @@ export function makeGalleon() {
 	crate.rotation.y = 0.4;
 	ship.add(crate);
 
-	/* the robot crew member, at the helm on the quarterdeck */
-	const robot = makeRobot(brass, teal);
-	robot.group.position.set(-L / 2 + 2.15, 1.28, 0.45);
-	robot.group.rotation.y = Math.PI / 2 + 0.5;
-	robot.group.scale.setScalar(0.62);
-	ship.add(robot.group);
-	const consoleLight = new THREE.PointLight('#5ad6c9', 2.5, 3.5, 2);
+	/* the captain takes the helm; the first panel includes a wooden wheel */
+	const captain = makePirateSprite('/images/arul-pirate-helm-hires.png', { width: 2.65, height: 4.3, frame: 0 });
+	captain.baseY = 3.42;
+	captain.sprite.position.set(-L / 2 + 3.15, captain.baseY, 0.55);
+	captain.sprite.rotation.y = -0.15;
+	ship.add(captain.sprite);
+	const consoleLight = new THREE.PointLight('#5ad6c9', 1.8, 3.5, 2);
 	consoleLight.position.set(-L / 2 + 2.6, 2.2, 0.9);
 	ship.add(consoleLight);
 
@@ -1048,7 +969,7 @@ export function makeGalleon() {
 		sails,
 		pennant,
 		lanternLight,
-		robot,
+		captain,
 		length: L
 	};
 }
