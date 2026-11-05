@@ -64,15 +64,6 @@
 		<path d="M283 12 L410 214 L283 214 Z" fill="#e8dcc0" opacity="0.6" />
 		<rect x="-30" y="196" width="70" height="40" fill="#3a2618" />
 		<circle cx="-34" cy="190" r="6" fill="#ffc46b" />
-		<!-- robot crew member -->
-		<g transform="translate(70 168)">
-			<rect x="-14" y="22" width="28" height="36" rx="6" fill="#8d97a6" />
-			<rect x="-20" y="-6" width="40" height="28" rx="5" fill="#8d97a6" />
-			<rect x="-15" y="0" width="30" height="14" rx="2" fill="#04151a" />
-			<rect x="-11" y="5" width="16" height="3" fill="#5ad6c9" />
-			<circle cx="20" cy="2" r="4" fill="#5ad6c9" />
-			<path d="M-26 -8 L26 -8 L0 -20 Z" fill="#1b2230" />
-		</g>
 	</g>
 </svg>
 

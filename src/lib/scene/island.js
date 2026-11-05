@@ -1,8 +1,7 @@
 // @ts-nocheck — three ships no bundled types; this file is checked by running it.
 /**
- * Signal Isle: a small rocky island with palms and a stone beacon tower.
- * The brazier ignites and a slow beam sweeps the sea as the visitor
- * reaches the contact section. Original, generated in code.
+ * Signal Isle: a small rocky island with palms and a driftwood signal fire
+ * in a ring of stones, lit as the visitor reaches the contact section. Original, generated in code.
  */
 import * as THREE from 'three';
 
@@ -52,7 +51,6 @@ export function makeSignalIsle() {
 	const rock = new THREE.MeshStandardMaterial({ color: '#141a22', roughness: 0.95 });
 	const sand = new THREE.MeshStandardMaterial({ color: '#2a2a28', roughness: 1 });
 	const stone = new THREE.MeshStandardMaterial({ color: '#3a3833', roughness: 0.9 });
-	const brass = new THREE.MeshStandardMaterial({ color: '#c8913c', metalness: 0.85, roughness: 0.35 });
 
 	// island body: a lumpy, flattened hemisphere with a sand skirt
 	const hill = new THREE.SphereGeometry(14, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -93,22 +91,23 @@ export function makeSignalIsle() {
 		root.add(t);
 	}
 
-	// beacon tower
-	const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 7, 12), stone);
-	tower.position.set(0, 7.5, 0);
-	root.add(tower);
-	for (let i = 0; i < 4; i++) {
-		const band = new THREE.Mesh(new THREE.TorusGeometry(1.4 - i * 0.14, 0.06, 6, 24), stone);
-		band.rotation.x = Math.PI / 2;
-		band.position.set(0, 4.5 + i * 1.6, 0);
-		root.add(band);
+	// signal beacon: a ring of stones and a stacked driftwood fire on the summit (no tower)
+	const FIRE_Y = 5.0;
+	for (let i = 0; i < 9; i++) {
+		const a = (i / 9) * Math.PI * 2;
+		const st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), stone);
+		st.position.set(Math.cos(a) * 1.35, FIRE_Y - 0.25, Math.sin(a) * 1.35);
+		st.rotation.set(a, a * 2, 0);
+		root.add(st);
 	}
-	const gallery = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.1, 0.35, 16), stone);
-	gallery.position.set(0, 11.15, 0);
-	root.add(gallery);
-	const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.55, 0.7, 16, 1, true), brass);
-	bowl.position.set(0, 11.7, 0);
-	root.add(bowl);
+	const woodMat = new THREE.MeshStandardMaterial({ color: '#2a1a10', roughness: 0.95 });
+	for (let i = 0; i < 6; i++) {
+		const log = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 1.9, 6), woodMat);
+		const a = (i / 6) * Math.PI * 2;
+		log.position.set(Math.cos(a) * 0.35, FIRE_Y + 0.35, Math.sin(a) * 0.35);
+		log.rotation.set(Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45);
+		root.add(log);
+	}
 
 	// fire: stacked additive sprites + light
 	const fireTex = flameTexture();
@@ -117,7 +116,7 @@ export function makeSignalIsle() {
 		const s = new THREE.Sprite(
 			new THREE.SpriteMaterial({ map: fireTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })
 		);
-		s.position.set((Math.random() - 0.5) * 0.6, 12.1 + i * 0.25, (Math.random() - 0.5) * 0.6);
+		s.position.set((Math.random() - 0.5) * 0.6, FIRE_Y + 0.6 + i * 0.25, (Math.random() - 0.5) * 0.6);
 		s.userData.seed = Math.random() * 10;
 		s.scale.setScalar(1.6);
 		root.add(s);
@@ -126,29 +125,12 @@ export function makeSignalIsle() {
 	const halo = new THREE.Sprite(
 		new THREE.SpriteMaterial({ map: fireTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })
 	);
-	halo.position.set(0, 12.4, 0);
+	halo.position.set(0, FIRE_Y + 0.9, 0);
 	halo.scale.setScalar(9);
 	root.add(halo);
 	const light = new THREE.PointLight('#ff9a3c', 0, 60, 1.4);
-	light.position.set(0, 12.6, 0);
+	light.position.set(0, FIRE_Y + 1.1, 0);
 	root.add(light);
-
-	// sweeping beam
-	const beamGeo = new THREE.ConeGeometry(4, 46, 24, 1, true);
-	beamGeo.translate(0, -23, 0);
-	beamGeo.rotateZ(Math.PI / 2);
-	const beamMat = new THREE.ShaderMaterial({
-		transparent: true,
-		depthWrite: false,
-		blending: THREE.AdditiveBlending,
-		side: THREE.DoubleSide,
-		uniforms: { uOpacity: { value: 0 } },
-		vertexShader: `varying float vX; void main(){ vX = position.x; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-		fragmentShader: `uniform float uOpacity; varying float vX; void main(){ float f = 1.0 - clamp(vX / 46.0, 0.0, 1.0); gl_FragColor = vec4(1.0, 0.78, 0.45, uOpacity * f * f * 0.22); }`
-	});
-	const beam = new THREE.Mesh(beamGeo, beamMat);
-	beam.position.set(0, 12.4, 0);
-	root.add(beam);
 
 	/**
 	 * @param {number} lit 0..1 ignition level
@@ -160,12 +142,10 @@ export function makeSignalIsle() {
 			const flick = 0.75 + 0.25 * Math.sin(time * 9 + k) * Math.sin(time * 5.3 + k * 2);
 			s.material.opacity = lit * flick;
 			s.scale.setScalar((1.2 + 0.6 * lit) * (0.85 + 0.3 * Math.sin(time * 4 + k)));
-			s.position.y = 12.1 + ((time * 0.8 + k) % 1.5) * lit;
+			s.position.y = FIRE_Y + 0.6 + ((time * 0.8 + k) % 1.5) * lit;
 		}
-		halo.material.opacity = lit * 0.35;
-		light.intensity = lit * (2200 + Math.sin(time * 11) * 200);
-		beamMat.uniforms.uOpacity.value = lit;
-		beam.rotation.y = time * 0.35;
+		halo.material.opacity = lit * 0.22;
+		light.intensity = lit * (650 + Math.sin(time * 11) * 60);
 	}
 	update(0, 0);
 

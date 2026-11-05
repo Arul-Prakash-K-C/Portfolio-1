@@ -4,8 +4,7 @@
  *
  * Generic age-of-sail anatomy (lofted hull, stern castle, three masts,
  * square rig, rigging), with an identity of its own: weathered umber wood,
- * brass trim, ash-grey patched canvas, a brass automaton figurehead and a
- * compass-and-gear pennant. Every mesh and texture is generated here; no
+ * brass trim, ash-grey canvas, a brass figurehead and a plain red pennant. Every mesh and texture is generated here; no
  * external models or images are used.
  */
 import * as THREE from 'three';
@@ -238,42 +237,17 @@ function tatterAlpha(seed, severity) {
 
 /** Compass-and-gear pennant: an original emblem. */
 function pennantTexture() {
+	// a plain, weathered long pennant: dark red with a faded edge stripe, no emblem
 	return canvasTex(256, 128, (ctx, w, h) => {
-		ctx.fillStyle = '#10161f';
+		const g = ctx.createLinearGradient(0, 0, w, 0);
+		g.addColorStop(0, '#5a1712');
+		g.addColorStop(1, '#3d0f0c');
+		ctx.fillStyle = g;
 		ctx.fillRect(0, 0, w, h);
-		ctx.fillStyle = '#d9a84e';
-		const cx = 70,
-			cy = 64;
-		// gear
-		ctx.beginPath();
-		for (let i = 0; i < 24; i++) {
-			const a = (i / 24) * Math.PI * 2;
-			const rad = i % 2 ? 34 : 40;
-			ctx.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
-		}
-		ctx.closePath();
-		ctx.fill();
-		ctx.fillStyle = '#10161f';
-		ctx.beginPath();
-		ctx.arc(cx, cy, 26, 0, Math.PI * 2);
-		ctx.fill();
-		// compass needle
-		ctx.fillStyle = '#efe4cc';
-		ctx.beginPath();
-		ctx.moveTo(cx, cy - 24);
-		ctx.lineTo(cx + 6, cy);
-		ctx.lineTo(cx, cy + 24);
-		ctx.lineTo(cx - 6, cy);
-		ctx.closePath();
-		ctx.fill();
-		ctx.fillStyle = '#5ad6c9';
-		ctx.beginPath();
-		ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-		ctx.fill();
-		// code brackets
-		ctx.fillStyle = '#d9a84e';
-		ctx.font = 'bold 54px monospace';
-		ctx.fillText('</>', 128, 82);
+		ctx.fillStyle = 'rgba(220,190,140,0.35)';
+		ctx.fillRect(0, 10, w, 6);
+		ctx.fillRect(0, h - 16, w, 6);
+		grain(ctx, w, h, rng(41), 900, 0.08);
 	});
 }
 

@@ -28,7 +28,7 @@
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:image" content={image} />
-	<meta property="og:image:alt" content="A moonlit ship at sea with a robot crew member, beside the name Arul Prakash K C." />
+	<meta property="og:image:alt" content="A moonlit sailing ship with Arul as captain at the wheel, beside the name Arul Prakash K C." />
 	{#if siteUrl}<meta property="og:url" content={siteUrl} /><link rel="canonical" href={siteUrl} />{/if}
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={title} />

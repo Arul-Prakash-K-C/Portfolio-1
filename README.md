@@ -1,6 +1,6 @@
 # Arul Prakash K C — Portfolio
 
-A one-page developer portfolio with an original moonlit-sea, pirate-and-robot theme.
+A one-page developer portfolio with an original moonlit, age-of-sail theme: Arul as the ship's captain.
 Built with **SvelteKit + Svelte 5** (Arul's main stack) and a hand-written **Three.js** scene. It's exported as a static site.
 
 ## Run it
@@ -28,12 +28,12 @@ For any other static host, deploy the `build/` folder.
 | `src/lib/data/profile.js` | Name, contact, résumé link, education, experience, certifications, skills |
 | `src/lib/data/projects.js` | Voyage log: project case studies and smaller log entries |
 | `src/lib/scene/voyage.js` | The 3D world and the **story timeline**: ocean, sky, fog, camera path through the six stages, prop animation, film post-processing |
-| `src/lib/scene/galleon.js` | The original galleon, *The Night Compiler*: lofted hull, procedural textures, rig, sails and Bit the robot |
+| `src/lib/scene/galleon.js` | The original galleon, *The Night Compiler*: lofted hull, procedural textures, rig and sails |
 | `src/lib/scene/props.js` | Original story props: the captain, the ship's wheel, the chart table with a live treasure map, compass, telescope, logbook, treasure chest |
 | `src/lib/scene/island.js` | Signal Isle: palms, stone tower, a brazier that ignites and a sweeping beam |
 | `src/lib/scene/bus.js` | Tiny bridge so sections can tell the scene what's in focus (skill tab, project card) |
 | `src/lib/components/SceneHost.svelte` | The fixed page-wide canvas: loading, fallback, pause, intro skip, and the scroll → timeline mapping |
-| `src/lib/components/` | Page sections, the case-study dialog, nav and the robot companion ("Bit") |
+| `src/lib/components/` | Page sections, the case-study dialog, nav and the ship's-log tips |
 | `static/projects/` | Project screenshots |
 
 Empty fields are **hidden**, never shown as placeholders. Fill them in and the matching UI appears:

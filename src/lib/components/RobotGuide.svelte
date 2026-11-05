@@ -1,5 +1,5 @@
 <!--
-  "Bit", the ship's robot engineer. Gives one short, optional tip when a new
+  The ship's log tips. Gives one short, optional note when a new
   section comes into view, then tucks itself away after a few seconds so it
   never sits on top of content. Not needed for navigation; can be muted.
 -->
@@ -8,9 +8,9 @@
 	import { profile } from '$lib/data/profile.js';
 
 	const tips = {
-		home: 'Ahoy! I’m Bit, ship’s engineer. Scroll to sail on; the nav jumps straight to any port.',
+		home: 'Ahoy! Scroll to sail on; the nav jumps straight to any port.',
 		projects: 'Every card opens a mission file: the goal, Arul’s role, the stack and where each detail comes from.',
-		about: 'That’s the captain at the wheel. He steers; Arul writes the code.',
+		about: 'That’s Arul as captain: watch him fire, read the chart, cross swords and take the wheel again.',
 		skills: 'Pick a system and the compass swings to it. No made-up percentages, just where each tool was used.',
 		experience: 'The ship’s log: the current internship, both degrees and the course projects.',
 		contact: profile.email
@@ -49,7 +49,7 @@
 			try {
 				localStorage.removeItem('bit-muted');
 			} catch {}
-			tip = 'Back on watch. I’ll keep it brief.';
+			tip = 'Tips are back on. They stay brief.';
 			show = true;
 			clearTimeout(timer);
 			timer = setTimeout(() => (show = false), 4000);
@@ -95,7 +95,7 @@
 	});
 </script>
 
-<aside class="guide" aria-label="Ship’s robot tips">
+<aside class="guide" aria-label="Ship’s log tips">
 	{#if show}
 		<div class="bubble" id="bit-bubble">
 			<p>{tip}</p>
@@ -108,16 +108,15 @@
 		onclick={toggle}
 		aria-expanded={show}
 		aria-controls="bit-bubble"
-		aria-label={muted ? 'Turn robot tips back on' : show ? 'Hide robot tip' : 'Show robot tip'}
+		aria-label={muted ? 'Turn tips back on' : show ? 'Hide tip' : 'Show tip'}
 		class:muted
 	>
 		<svg viewBox="0 0 48 48" width="40" height="40" aria-hidden="true">
-			<path d="M10 12 L38 12 L24 4 Z" fill="#1b2230" />
-			<rect x="8" y="12" width="32" height="24" rx="6" fill="#8d97a6" />
-			<rect x="12" y="17" width="24" height="12" rx="2" fill="#04151a" />
-			<rect class="cursor" x="15" y="21" width="10" height="3" fill="#5ad6c9" />
-			<circle cx="40" cy="18" r="3" fill="#5ad6c9" />
-			<rect x="16" y="36" width="16" height="8" rx="3" fill="#6b7686" />
+			<circle cx="24" cy="24" r="17" fill="#0b1422" stroke="#d9a84e" stroke-width="2.5" />
+			<circle cx="24" cy="24" r="12.5" fill="none" stroke="#d9a84e" stroke-opacity="0.35" stroke-width="1" />
+			<path d="M24 9 L27.5 24 L24 39 L20.5 24 Z" fill="#efe4cc" />
+			<path d="M24 9 L27.5 24 L20.5 24 Z" fill="#5ad6c9" />
+			<circle cx="24" cy="24" r="2.4" fill="#d9a84e" />
 		</svg>
 	</button>
 </aside>
@@ -156,14 +155,6 @@
 	}
 	.bot.muted {
 		opacity: 0.55;
-	}
-	.cursor {
-		animation: blink 1.1s steps(2) infinite;
-	}
-	@keyframes blink {
-		50% {
-			opacity: 0;
-		}
 	}
 	.bubble {
 		max-width: min(290px, calc(100vw - 32px));
