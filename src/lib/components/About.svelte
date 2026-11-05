@@ -1,6 +1,7 @@
 <script>
 	import { about, education, experience } from '$lib/data/profile.js';
 	import { reveal } from '$lib/actions.js';
+	import AboutScene from './AboutScene.svelte';
 
 	// One logbook: current role first, then education.
 	const log = [
@@ -10,6 +11,7 @@
 </script>
 
 <section id="about" class="section about" aria-labelledby="about-title">
+	<AboutScene />
 	<div class="container cols">
 		<div class="intro">
 			<header class="section-head reveal" use:reveal>
@@ -24,8 +26,8 @@
 		<div class="book reveal" use:reveal style="--d:120ms">
 			<h3 class="book-title">Logbook</h3>
 			<ol class="timeline">
-				{#each log as item}
-					<li>
+				{#each log as item, i}
+					<li style="--unroll-order:{i}">
 						<span class="kind">{item.kind}</span>
 						<p class="period">{item.period}</p>
 						<h4>{item.title}</h4>
@@ -40,15 +42,18 @@
 
 <style>
 	.about {
+		position: relative;
+		isolation: isolate;
 		background: var(--navy);
 		border-top: 1px solid var(--line);
+		min-height: 100svh;
 	}
 	.cols {
-		display: grid;
-		grid-template-columns: 1.1fr 0.9fr;
-		gap: clamp(32px, 6vw, 80px);
-		align-items: start;
+		position: relative;
+		z-index: 2;
+		display: block;
 	}
+	.intro { max-width: min(57%, 650px); }
 	.para {
 		color: var(--parchment-2);
 		font-size: 1.1rem;
@@ -59,18 +64,40 @@
 	}
 	.book {
 		position: relative;
-		padding: clamp(22px, 3vw, 32px);
-		border-radius: 18px;
-		background: linear-gradient(160deg, #efe4cc, #dccca6);
+		z-index: 2;
+		max-width: min(57%, 650px);
+		margin-top: clamp(42px, 6vw, 76px);
+		padding: clamp(30px, 3.5vw, 42px) clamp(26px, 3vw, 36px);
+		border-radius: 12px;
+		background:
+			linear-gradient(90deg, rgba(107, 73, 35, .16), transparent 5%, transparent 94%, rgba(107, 73, 35, .14)),
+			repeating-linear-gradient(0deg, rgba(103, 71, 36, .028) 0 1px, transparent 1px 6px),
+			linear-gradient(160deg, #f1e5c8, #d8c59b);
 		color: #2b2114;
-		box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35);
+		box-shadow: 0 34px 80px rgba(0, 0, 0, 0.42), inset 0 0 34px rgba(100, 66, 29, .14);
 	}
 	.book::before {
 		content: '';
 		position: absolute;
-		inset: 10px;
-		border: 1px solid rgba(90, 60, 25, 0.3);
-		border-radius: 12px;
+		left: -8px;
+		right: -8px;
+		top: -11px;
+		height: 18px;
+		border-radius: 50%;
+		background: linear-gradient(180deg, #ddc89c, #8a6637 48%, #c3a875 70%, #ead8b1);
+		box-shadow: 0 3px 8px rgba(0, 0, 0, .28);
+		pointer-events: none;
+	}
+	.book::after {
+		content: '';
+		position: absolute;
+		left: -8px;
+		right: -8px;
+		bottom: -11px;
+		height: 18px;
+		border-radius: 50%;
+		background: linear-gradient(180deg, #ead8b1, #c3a875 30%, #8a6637 58%, #ddc89c);
+		box-shadow: 0 5px 9px rgba(0, 0, 0, .24);
 		pointer-events: none;
 	}
 	.book-title {
@@ -89,7 +116,10 @@
 	}
 	.timeline li {
 		position: relative;
+		transform-origin: top left;
 	}
+	:global(.book.is-in .timeline li) { animation: unroll-entry 720ms cubic-bezier(.2,.8,.22,1) both; animation-delay: calc(var(--unroll-order) * 140ms); }
+	@keyframes unroll-entry { from { opacity: .15; clip-path: inset(0 0 82%); transform: translateY(-10px) scaleY(.72); } to { opacity: 1; clip-path: inset(0); transform: translateY(0) scaleY(1); } }
 	.timeline li::before {
 		content: '';
 		position: absolute;
@@ -128,8 +158,7 @@
 		margin-top: 4px;
 	}
 	@media (max-width: 860px) {
-		.cols {
-			grid-template-columns: 1fr;
-		}
+		.intro, .book { max-width: 100%; }
 	}
+	@media (prefers-reduced-motion: reduce) { :global(.book.is-in .timeline li) { animation: none; } }
 </style>

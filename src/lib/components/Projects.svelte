@@ -9,6 +9,22 @@
 	/** @type {HTMLElement | null} */
 	let returnFocus = null;
 
+	function chartReveal(node) {
+		node.classList.add('chart-pending');
+		if (typeof IntersectionObserver === 'undefined') {
+			node.classList.add('chart-arrived');
+			return {};
+		}
+		const observer = new IntersectionObserver(([entry]) => {
+			if (entry.isIntersecting) {
+				node.classList.add('chart-arrived');
+				observer.disconnect();
+			}
+		}, { rootMargin: '0px 0px -10% 0px', threshold: 0.14 });
+		observer.observe(node);
+		return { destroy: () => observer.disconnect() };
+	}
+
 	/** @param {any} p @param {MouseEvent} e */
 	function open(p, e) {
 		returnFocus = /** @type {HTMLElement} */ (e.currentTarget);
@@ -31,9 +47,47 @@
 			</p>
 		</header>
 
-		<ol class="grid">
+		<div class="chart-route">
+			<div class="chart-backdrop" aria-hidden="true">
+				<svg viewBox="0 0 1000 1600" preserveAspectRatio="none">
+					<defs>
+						<linearGradient id="route-ink" x1="0" y1="0" x2="0" y2="1">
+							<stop offset="0" stop-color="#bd8740" stop-opacity="0.05" />
+							<stop offset="0.12" stop-color="#bd8740" stop-opacity="0.9" />
+							<stop offset="0.88" stop-color="#bd8740" stop-opacity="0.9" />
+							<stop offset="1" stop-color="#bd8740" stop-opacity="0.05" />
+						</linearGradient>
+						<pattern id="chart-grain" width="52" height="52" patternUnits="userSpaceOnUse">
+							<circle cx="7" cy="11" r="1" fill="#c69a58" fill-opacity=".18" />
+							<circle cx="37" cy="39" r=".8" fill="#c69a58" fill-opacity=".14" />
+							<path d="M0 26h52M26 0v52" stroke="#c69a58" stroke-opacity=".06" stroke-width=".6" />
+						</pattern>
+					</defs>
+					<rect width="1000" height="1600" fill="url(#chart-grain)" />
+					<g fill="none" stroke="#9c7544" stroke-opacity=".18" stroke-width="2">
+						<path d="M80 150C180 70 260 200 355 124s184-5 264-61 211 54 320 8" />
+						<path d="M52 182C168 92 244 232 340 154s185-6 271-65 219 55 343 9" />
+						<path d="M42 218C146 127 227 269 326 190s202-10 289-68 223 50 348 4" />
+						<path d="M63 1490c114-96 206 27 292-53s178 21 270-55 182 39 302-36" />
+						<path d="M36 1532c130-102 214 18 312-61s176 28 284-55 180 43 319-39" />
+					</g>
+					<path class="route-line" d="M520 36C396 140 632 208 474 316s106 182 4 300 138 172 42 298-162 142-33 284 3 185-26 300 67 107 41 187" />
+					<g class="chart-islands">
+						<path d="M112 370c18-48 64-64 93-36 21 18 47 5 60 31 18 37-14 75-50 76-23 1-35 25-68 14-33-10-51-48-35-85Z" />
+						<path d="M723 610c18-38 66-61 94-39 23 18 48 11 59 39 15 36-20 70-50 72-30 3-38 23-72 11-31-12-46-48-31-83Z" />
+						<path d="M142 1032c16-43 59-67 91-46 22 15 45 14 57 41 17 39-18 68-49 74-33 7-39 29-74 16-33-12-39-49-25-85Z" />
+						<path d="M745 1338c19-42 61-53 87-31 22 18 51 12 58 40 10 37-26 64-56 64-26 0-41 20-72 5-31-15-31-50-17-78Z" />
+					</g>
+					<g class="waypoints">
+						<circle cx="512" cy="205" r="10" /><circle cx="482" cy="515" r="10" />
+						<circle cx="538" cy="825" r="10" /><circle cx="482" cy="1134" r="10" /><circle cx="520" cy="1433" r="10" />
+					</g>
+				</svg>
+				<div class="chart-rose"><span>N</span><i>✦</i><small>W · E · S</small></div>
+			</div>
+			<ol class="grid">
 			{#each projects as p, i}
-				<li class="card reveal" use:reveal style="--d:{(i % 2) * 90}ms">
+				<li class="card map-card" use:chartReveal style="--d:{(i % 2) * 90}ms; --n:{i}">
 					<div class="cover">
 						{#if p.shots.length}
 							<img src={p.shots[0].src} alt={p.shots[0].alt} loading="lazy" decoding="async" width="1199" height="674" />
@@ -72,7 +126,8 @@
 					</div>
 				</li>
 			{/each}
-		</ol>
+			</ol>
+		</div>
 
 		<div class="log reveal" use:reveal>
 			<h3 class="log-title">Earlier entries in the log</h3>
@@ -109,14 +164,35 @@
 			radial-gradient(80% 60% at 85% 0%, rgba(90, 214, 201, 0.06), transparent 60%),
 			linear-gradient(180deg, var(--ink), var(--navy) 30%, var(--navy));
 	}
+	.chart-route { position: relative; isolation: isolate; padding: 24px 0; }
+	.chart-backdrop {
+		position: absolute;
+		inset: -24px max(-18vw, -220px);
+		z-index: -1;
+		pointer-events: none;
+		opacity: .52;
+		mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
+	}
+	.chart-backdrop svg { display: block; width: 100%; height: 100%; min-height: 1350px; overflow: visible; }
+	.chart-backdrop rect { opacity: .35; }
+	.route-line { fill:none; stroke:url(#route-ink); stroke-width:3; stroke-dasharray:3 12; stroke-linecap:round; }
+	.chart-islands { fill:#6c805e; stroke:#b69560; stroke-width:4; stroke-opacity:.45; }
+	.waypoints { fill:#e6c27e; stroke:#19202a; stroke-width:7; }
+	.waypoints circle { filter: drop-shadow(0 0 9px rgba(230,194,126,.42)); }
+	.chart-rose { position:absolute; top:28px; right:6%; color:#d8bc84; display:grid; justify-items:center; opacity:.62; font-family:var(--font-mono); font-size:.68rem; letter-spacing:.2em; }
+	.chart-rose i { font-style:normal; font-size:2rem; line-height:1.1; }
 	.grid {
 		list-style: none;
 		padding: 0;
 		margin: 0;
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: clamp(18px, 3vw, 30px);
+		display: flex;
+		flex-direction: column;
+		gap: clamp(54px, 8vw, 108px);
 	}
+	.map-card { width: min(100%, 690px); transform-origin: 50% 20%; transition: opacity 800ms ease, transform 1100ms cubic-bezier(.16,.82,.22,1), filter 900ms ease; }
+	.map-card:nth-child(even) { margin-left: auto; }
+	:global(.map-card.chart-pending) { opacity: 0; transform: translate3d(0, 88px, 0) scale(.91) rotate(-1.2deg); filter: blur(6px); }
+	:global(.map-card.chart-arrived) { opacity: 1; transform: translate3d(0, 0, 0) scale(1) rotate(0); filter: blur(0); transition-delay: var(--d); }
 	.card {
 		position: relative;
 		display: flex;
@@ -140,7 +216,7 @@
 		position: relative;
 		aspect-ratio: 16 / 9;
 		overflow: hidden;
-		background: #fff;
+		background: #0b1521;
 		border-bottom: 1px solid var(--line);
 	}
 	.cover img {
@@ -279,9 +355,15 @@
 		}
 	}
 	@media (max-width: 760px) {
-		.grid,
 		.entries {
 			grid-template-columns: 1fr;
 		}
+		.chart-backdrop { inset-inline: -18vw; opacity:.34; }
+		.chart-rose { right: 8%; }
+		.map-card, .map-card:nth-child(even) { width:100%; margin-left:0; }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		:global(.map-card.chart-pending) { opacity: 1; transform: none; filter: none; }
+		.map-card, :global(.map-card.chart-arrived) { transition:none; }
 	}
 </style>
