@@ -656,9 +656,17 @@ export function makeGalleon() {
 			win.position.set(sternX - 0.01, row.y, z);
 			win.rotation.y = -Math.PI / 2;
 			ship.add(win);
-			const mull = new THREE.Mesh(new THREE.BoxGeometry(0.03, row.h + 0.08, row.w + 0.08), brass);
-			mull.position.set(sternX + 0.0, row.y, z);
-			ship.add(mull);
+			// thin brass window frame (four bars), outside the transom
+			for (const [fy, fz, hh, ww] of [
+				[row.h / 2 + 0.02, 0, 0.03, row.w + 0.06],
+				[-row.h / 2 - 0.02, 0, 0.03, row.w + 0.06],
+				[0, row.w / 2 + 0.02, row.h + 0.06, 0.03],
+				[0, -row.w / 2 - 0.02, row.h + 0.06, 0.03]
+			]) {
+				const bar = new THREE.Mesh(new THREE.BoxGeometry(0.02, hh, ww), brass);
+				bar.position.set(sternX - 0.03, row.y + fy, z + fz);
+				ship.add(bar);
+			}
 		}
 		// balcony under each row of windows
 		const bal = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, half * 2 + 0.2), darkWood);
@@ -676,29 +684,6 @@ export function makeGalleon() {
 		}
 		ship.add(balusters);
 	}
-	// taffrail crest
-	const crest = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 8, 24, Math.PI), brass);
-	crest.position.set(sternX, sheer(0) + 0.05, 0);
-	crest.rotation.y = Math.PI / 2;
-	ship.add(crest);
-	// quarter galleries on both sides near the stern
-	for (const side of [-1, 1]) {
-		const p = hullPoint(0.08, 0.18, side);
-		const qg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.3), darkWood);
-		qg.position.set(p.x, p.y + 0.1, p.z + side * 0.12);
-		ship.add(qg);
-		for (let i = 0; i < 3; i++) {
-			const w = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.26), windowMat);
-			w.position.set(p.x - 0.28 + i * 0.28, p.y + 0.14, p.z + side * 0.28);
-			if (side < 0) w.rotation.y = Math.PI;
-			ship.add(w);
-		}
-		const cap = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), brass);
-		cap.scale.set(1.5, 0.6, 0.6);
-		cap.position.set(p.x, p.y + 0.45, p.z + side * 0.12);
-		ship.add(cap);
-	}
-
 	/* stern lanterns */
 	const lanternGlass = new THREE.MeshBasicMaterial({ color: '#ffcf7a', toneMapped: false });
 	const lanterns = [];
@@ -814,8 +799,6 @@ export function makeGalleon() {
 			const h = yardY[yi] - footY[yi];
 			const mat = new THREE.MeshStandardMaterial({
 				map: sailTex[(mi + yi) % 3],
-				alphaMap: tatterAlpha(sailSeed++, m.sev[yi]),
-				alphaTest: 0.5,
 				side: THREE.DoubleSide,
 				roughness: 0.95,
 				color: '#b9b4a8',
@@ -837,19 +820,19 @@ export function makeGalleon() {
 			ship.add(gaff);
 			const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 3.6, 8), spar);
 			boom.rotation.z = Math.PI / 2;
-			boom.position.set(m.x - 1.8, deckY + 1.75, 0);
+			boom.position.set(m.x - 1.8, deckY + 2.95, 0); // clear of the helmsman's head
 			ship.add(boom);
 			const shape = new THREE.Shape();
-			shape.moveTo(0, deckY + 1.8);
+			shape.moveTo(0, deckY + 3.0);
 			shape.lineTo(0, deckY + lowerH * 0.92);
 			shape.lineTo(-gaffLen * 0.88, deckY + lowerH * 0.92 + gaffLen * 0.4);
-			shape.lineTo(-3.5, deckY + 1.8);
+			shape.lineTo(-3.5, deckY + 3.0);
 			shape.closePath();
 			const sg = new THREE.ShapeGeometry(shape, 12);
 			const uvA = sg.attributes.uv;
 			const pA = sg.attributes.position;
 			for (let i = 0; i < pA.count; i++) {
-				uvA.setXY(i, -pA.getX(i) / 3.5, (pA.getY(i) - deckY - 1.8) / (lowerH * 0.9));
+				uvA.setXY(i, -pA.getX(i) / 3.5, (pA.getY(i) - deckY - 3.0) / (lowerH * 0.92 - 3.0));
 				pA.setZ(i, Math.sin((-pA.getX(i) / 3.5) * Math.PI) * 0.35);
 			}
 			sg.computeVertexNormals();
@@ -857,8 +840,6 @@ export function makeGalleon() {
 				sg,
 				new THREE.MeshStandardMaterial({
 					map: sailTex[2],
-					alphaMap: tatterAlpha(sailSeed++, 0.6),
-					alphaTest: 0.5,
 					side: THREE.DoubleSide,
 					roughness: 0.95,
 					color: '#b9b4a8',
@@ -917,8 +898,6 @@ export function makeGalleon() {
 	// jibs: triangular headsails on the forestays
 	const jibMat = new THREE.MeshStandardMaterial({
 		map: sailTex[1],
-		alphaMap: tatterAlpha(sailSeed++, 0.5),
-		alphaTest: 0.5,
 		side: THREE.DoubleSide,
 		roughness: 0.95,
 		color: '#b9b4a8',

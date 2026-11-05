@@ -1,80 +1,80 @@
 <script>
 	import { certifications } from '$lib/data/profile.js';
 	import { ports } from '$lib/data/voyage.js';
-	import { reveal } from '$lib/actions.js';
-	import { setFocus } from '$lib/scene/bus.js';
 	import { onMount } from 'svelte';
 
-	/** @type {HTMLOListElement} */
-	let list;
-	let active = $state(-1);
+	/** @type {HTMLElement} */
+	let scroll;
+	/** @type {HTMLElement} */
+	let sheet;
+	let unfurled = $state(false);
 
+	// unroll the captain's log once it is well into view (once only)
 	onMount(() => {
-		const steps = Array.from(list.querySelectorAll(':scope > li'));
-		const seen = new Map();
+		// the bottom roller starts tucked against the top one
+		scroll.style.setProperty('--roll', `-${sheet.offsetHeight}px`);
+		if (typeof IntersectionObserver === 'undefined') {
+			unfurled = true;
+			return;
+		}
 		const io = new IntersectionObserver(
 			(entries) => {
-				for (const e of entries) seen.set(e.target, e.isIntersecting ? e.intersectionRect.height : 0);
-				let best = -1,
-					bestH = 0;
-				steps.forEach((c, i) => {
-					const h = seen.get(c) ?? 0;
-					if (h > bestH) {
-						best = i;
-						bestH = h;
-					}
-				});
-				if (best >= 0) active = best;
-				setFocus({ port: best >= 0 ? best : active });
+				if (entries.some((e) => e.isIntersecting)) {
+					unfurled = true;
+					io.disconnect();
+				}
 			},
-			{ rootMargin: '-40% 0px -40% 0px', threshold: [0, 0.5, 1] }
+			{ rootMargin: '0px 0px -25% 0px', threshold: 0.05 }
 		);
-		steps.forEach((c) => io.observe(c));
+		io.observe(scroll);
 		return () => io.disconnect();
 	});
 </script>
 
 <section id="experience" class="section stage-section experience" aria-labelledby="exp-title">
-	<div class="container voyage">
-		<header class="head reveal" use:reveal>
-			<p class="kicker">Log 04 · The ship’s log</p>
-			<h2 id="exp-title">Experience &amp; education</h2>
-			<p class="lede">The same ship, port by port: where Arul studied, the course projects built along the way, and the crew Arul sails with now.</p>
-		</header>
-
-		<ol class="ports" bind:this={list}>
-			{#each ports as p, i}
-				<li class="step" class:active={active === i}>
-					<article class="port reveal" use:reveal>
-						<p class="leg"><span class="no">{String(i + 1).padStart(2, '0')}</span>{p.kind}</p>
-						<p class="period">{p.period}</p>
-						<h3>{p.title}</h3>
-						<p class="org">{p.org}</p>
-						{#if p.points.length}
-							<ul class="points">
-								{#each p.points as pt}<li>{pt}</li>{/each}
-							</ul>
-						{/if}
-					</article>
-				</li>
-			{/each}
-		</ol>
-
-		{#if certifications.length}
-			<section class="certs" aria-labelledby="log-certs">
-				<h3 id="log-certs">Certifications</h3>
+	<div class="container log-wrap">
+		<!-- The captain's log: a parchment scroll that unrolls, then each real entry is inked in turn.
+		     All text is ordinary, selectable DOM; the animation only moves the paper and fades the ink. -->
+		<article class="scroll" class:unfurled bind:this={scroll} aria-labelledby="exp-title">
+			<div class="roller top" aria-hidden="true"></div>
+			<div class="sheet" bind:this={sheet}>
+				<header class="head">
+					<p class="kicker">Log 04 · The captain’s log</p>
+					<h2 id="exp-title">Experience &amp; education</h2>
+				</header>
 				<ol class="entries">
-					{#each certifications as c}
-						<li>
-							<p class="period">{c.date}</p>
-							<h4>{c.name}</h4>
-							<p class="org">{c.issuer}</p>
-							{#if c.url}<a href={c.url} target="_blank" rel="noopener">View credential ↗<span class="sr-only"> (opens in a new tab)</span></a>{/if}
+					{#each ports as p, i}
+						<li class="entry" style="--i:{i}">
+							<p class="meta"><span class="kind">{p.kind}</span><span class="period">{p.period}</span></p>
+							<h3>{p.title}</h3>
+							<p class="org">{p.org}</p>
+							{#if p.points.length}
+								<ul class="points">
+									{#each p.points as pt}<li>{pt}</li>{/each}
+								</ul>
+							{/if}
 						</li>
 					{/each}
 				</ol>
-			</section>
-		{/if}
+
+				{#if certifications.length}
+					<section class="certs" aria-labelledby="log-certs">
+						<h3 id="log-certs">Certifications</h3>
+						<ol class="entries">
+							{#each certifications as c}
+								<li class="entry">
+									<p class="meta"><span class="period">{c.date}</span></p>
+									<h4>{c.name}</h4>
+									<p class="org">{c.issuer}</p>
+									{#if c.url}<a href={c.url} target="_blank" rel="noopener">View credential ↗<span class="sr-only"> (opens in a new tab)</span></a>{/if}
+								</li>
+							{/each}
+						</ol>
+					</section>
+				{/if}
+			</div>
+			<div class="roller bottom" aria-hidden="true"></div>
+		</article>
 	</div>
 </section>
 
@@ -83,165 +83,161 @@
 		background: #06121a;
 		border-top: 1px solid rgba(90, 214, 201, 0.12);
 	}
-	.voyage {
-		display: grid;
-		gap: 24px;
+	.log-wrap {
+		display: flex;
 	}
-	.head {
-		max-width: 560px;
+	.scroll {
+		position: relative;
+		width: min(560px, 100%);
+		filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.55));
+	}
+	/* wooden rollers with brass end caps */
+	.roller {
+		position: relative;
+		height: 26px;
+		margin: 0 -14px;
+		border-radius: 13px;
+		background:
+			radial-gradient(circle at 7px 50%, #e0b25c 0 6px, #7a5622 7px, transparent 8px),
+			radial-gradient(circle at calc(100% - 7px) 50%, #e0b25c 0 6px, #7a5622 7px, transparent 8px),
+			linear-gradient(180deg, #6b4423, #3d2412 55%, #2a170b);
+		z-index: 2;
+	}
+	.sheet {
+		position: relative;
+		padding: clamp(26px, 4vw, 44px) clamp(22px, 4vw, 44px);
+		color: #2b2114;
+		background:
+			radial-gradient(120% 60% at 50% 0%, rgba(120, 80, 30, 0.18), transparent 60%),
+			radial-gradient(90% 50% at 10% 100%, rgba(110, 70, 25, 0.22), transparent 70%),
+			repeating-linear-gradient(0deg, rgba(90, 60, 25, 0.035) 0 2px, transparent 2px 5px),
+			linear-gradient(170deg, #f3e7cb, #e2cf9f 60%, #d8c18c);
+		box-shadow:
+			inset 0 12px 18px -10px rgba(60, 35, 10, 0.55),
+			inset 0 -12px 18px -10px rgba(60, 35, 10, 0.55),
+			inset 14px 0 30px -18px rgba(80, 50, 15, 0.5),
+			inset -14px 0 30px -18px rgba(80, 50, 15, 0.5);
+		transform-origin: 50% 0;
 	}
 	.kicker {
 		font-family: var(--font-mono);
 		font-size: 0.75rem;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
-		color: var(--teal);
-		font-weight: 700;
-	}
-	h2 {
-		font-size: clamp(1.8rem, 4vw, 2.6rem);
-		margin-top: 6px;
-	}
-	.lede {
-		color: var(--parchment-2);
-		margin-top: 10px;
-	}
-	.ports {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-		gap: 16px;
-	}
-	.step {
-		display: flex;
-	}
-	.port {
-		flex: 1;
-		position: relative;
-		padding: 22px 24px;
-		border-radius: 16px;
-		background: linear-gradient(160deg, #f1e6cd, #dccca6);
-		color: #2b2114;
-		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
-	}
-	.port::before {
-		content: '';
-		position: absolute;
-		inset: 8px;
-		border: 1px solid rgba(90, 60, 25, 0.3);
-		border-radius: 10px;
-		pointer-events: none;
-	}
-	.leg {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
 		color: #0d5e57;
 		font-weight: 700;
 	}
-	.no {
-		font-family: var(--font-display);
-		font-size: 0.8rem;
-		letter-spacing: 0;
-		padding: 1px 9px;
-		border-radius: 999px;
-		background: #2b2114;
-		color: #f3c46b;
+	h2 {
+		font-size: clamp(1.8rem, 4vw, 2.5rem);
+		color: #2b2114;
+		margin-top: 6px;
+	}
+	.entries {
+		list-style: none;
+		padding: 0;
+		margin: 22px 0 0;
+		display: grid;
+		gap: 0;
+	}
+	.entry {
+		padding: 16px 0 16px 22px;
+		border-top: 1px dashed rgba(90, 60, 25, 0.38);
+		position: relative;
+	}
+	.entry::before {
+		/* a small ink mark in the margin */
+		content: '';
+		position: absolute;
+		left: 2px;
+		top: 24px;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: #6a2a22;
+		box-shadow: 0 0 0 3px rgba(106, 42, 34, 0.15);
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 14px;
+		align-items: baseline;
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.kind {
+		color: #0d5e57;
+		font-weight: 700;
 	}
 	.period {
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
 		color: #5a4424;
-		margin-top: 12px;
 	}
 	h3 {
-		font-size: 1.3rem;
+		font-size: 1.22rem;
 		color: #2b2114;
-		margin-top: 2px;
+		margin-top: 4px;
+	}
+	h4 {
+		font-size: 1.05rem;
+		color: #2b2114;
 	}
 	.org {
 		color: #3d2e18;
 	}
 	.points {
-		margin-top: 8px;
+		margin-top: 6px;
 		padding-left: 18px;
 		color: #3d2e18;
 	}
+	.certs {
+		margin-top: 18px;
+	}
 	.certs h3 {
-		color: var(--parchment);
-	}
-	.entries {
-		list-style: none;
-		padding: 0;
-		display: grid;
-		gap: 12px;
-	}
-	h4 {
-		font-size: 1.05rem;
+		color: #6a4614;
 	}
 	a {
-		color: var(--teal);
+		color: #0d5e57;
 	}
 
-	/* ---------- 3D voyage on: one port at a time, the ship sails past each ---------- */
-	:global(html.scene-live) .experience {
-		display: block;
-	}
-	:global(html.scene-live) .experience .ports {
-		grid-template-columns: 1fr;
-		width: min(440px, 100%);
-		gap: 0;
-	}
-	:global(html.scene-live) .experience .step {
-		min-height: 88svh;
-		align-items: center;
-	}
-	:global(html.scene-live) .experience .step > .port {
-		opacity: 0.1;
-		transform: translateX(-28px) scale(0.96);
-		transition:
-			opacity 0.7s var(--ease-out),
-			transform 0.7s var(--ease-out);
-	}
-	:global(html.scene-live) .experience .step.active > .port {
-		opacity: 1;
-		transform: none;
-		animation: port-in 0.8s var(--ease-out);
-	}
-	:global(html.scene-live) .experience .head {
-		text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8);
-	}
-	@keyframes port-in {
-		0% {
-			opacity: 0;
-			transform: translateX(-40px) scale(0.92);
-			filter: blur(4px);
+	/* ---------- unfurl (JS on, motion allowed): paper rolls down, then each entry is inked ---------- */
+	@media (prefers-reduced-motion: no-preference) {
+		:global(.js) .scroll:not(.unfurled) .sheet {
+			transform: scaleY(0.04);
 		}
-		100% {
-			opacity: 1;
-			transform: none;
-			filter: none;
+		:global(.js) .scroll:not(.unfurled) .roller.bottom {
+			transform: translateY(var(--roll, -480px));
+		}
+		:global(.js) .scroll:not(.unfurled) .head,
+		:global(.js) .scroll:not(.unfurled) .entry {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		.sheet {
+			transition: transform 1.1s cubic-bezier(0.22, 0.8, 0.2, 1);
+		}
+		.roller.bottom {
+			transition: transform 1.1s cubic-bezier(0.22, 0.8, 0.2, 1);
+		}
+		.head,
+		.entry {
+			transition:
+				opacity 0.6s ease,
+				transform 0.6s ease;
+		}
+		.unfurled .head {
+			transition-delay: 0.7s;
+		}
+		.unfurled .entry {
+			transition-delay: calc(0.95s + var(--i, 0) * 0.22s);
 		}
 	}
 	@media (max-width: 759px) {
 		:global(html.scene-live) .experience {
-			padding-top: 0;
+			padding-top: 40svh;
 		}
-		:global(html.scene-live) .experience .step {
-			min-height: 100svh;
-			padding-bottom: 4svh;
-			align-items: flex-end;
-		}
-	}
-	@media (prefers-reduced-motion: reduce) {
-		:global(html.scene-live) .experience .step.active > .port {
-			animation: none;
+		.roller {
+			margin: 0 -8px;
 		}
 	}
 </style>

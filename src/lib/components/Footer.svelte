@@ -20,7 +20,7 @@
 		</nav>
 	</div>
 	<div class="container base">
-		<p>© {year} {profile.name}. Scene, ship and robot are original, generated in code.</p>
+		<p>© {year} {profile.name}. Ship and sea are generated in code; the 3D captain was generated from Arul’s own reference images.</p>
 		<a href="#home">Back to the start of the voyage ↑</a>
 	</div>
 </footer>

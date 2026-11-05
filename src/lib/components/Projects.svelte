@@ -11,6 +11,8 @@
 	/** @type {HTMLDivElement} */
 	let tether;
 	let active = $state(-1);
+	let pendingPop = -1;
+	let revealed = $state(-1);
 
 	/** Grow the newly active card out of the island that just rose on the 3D chart. */
 	function popFrom(/** @type {Element} */ card) {
@@ -57,6 +59,18 @@
 		const loop = () => {
 			raf = requestAnimationFrame(loop);
 			drawTether();
+			if (pendingPop >= 0) {
+				const root = document.documentElement;
+				const on = parseFloat(getComputedStyle(root).getPropertyValue('--pin-on')) || 0;
+				// no 3D chart (or a phone): show the card straight away
+				const no3d = !root.classList.contains('scene-live') || window.innerWidth < 760;
+				if (no3d || on > 0.5) {
+					const card = list.children[pendingPop]?.firstElementChild;
+					if (card && !no3d) popFrom(card);
+					revealed = Math.max(revealed, pendingPop);
+					pendingPop = -1;
+				}
+			}
 		};
 		raf = requestAnimationFrame(loop);
 		const cards = Array.from(list.querySelectorAll(':scope > li'));
@@ -75,7 +89,7 @@
 				});
 				if (best !== active) {
 					active = best;
-					if (best >= 0) setTimeout(() => cards[best].firstElementChild && popFrom(cards[best].firstElementChild), 380); // let the island rise first
+					pendingPop = best; // the card rises once the route has inked its way to the mark
 				}
 				setFocus({ project: best });
 			},
@@ -117,7 +131,7 @@
 
 		<ol class="grid" bind:this={list}>
 			{#each projects as p, i}
-				<li class="step" class:active={active === i}>
+				<li class="step" class:active={active === i && revealed >= i} class:ahead={i > revealed}>
 				<article class="card reveal" use:reveal style="--d:{(i % 2) * 90}ms" aria-labelledby="proj-{p.id}">
 					<div class="cover">
 						{#if p.shots.length}
@@ -423,6 +437,15 @@
 				filter 0.6s,
 				border-color var(--t-med),
 				box-shadow var(--t-med);
+		}
+		/* not reached yet: nothing shown in advance (a keyboard user tabbing in still gets it) */
+		:global(html.scene-live) .projects .grid > .step.ahead > .card {
+			opacity: 0;
+		}
+		:global(html.scene-live) .projects .grid > .step:focus-within > .card {
+			opacity: 1;
+			transform: none;
+			filter: none;
 		}
 		:global(html.scene-live) .projects .grid > .step.active > .card {
 			opacity: 1;

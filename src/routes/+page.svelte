@@ -9,6 +9,7 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import RobotGuide from '$lib/components/RobotGuide.svelte';
 	import SceneHost from '$lib/components/SceneHost.svelte';
+	import GlassImpact from '$lib/components/GlassImpact.svelte';
 	import { profile } from '$lib/data/profile.js';
 
 	const title = `${profile.name} | ${profile.role}`;
@@ -56,3 +57,4 @@
 </main>
 <Footer />
 <RobotGuide />
+<GlassImpact />

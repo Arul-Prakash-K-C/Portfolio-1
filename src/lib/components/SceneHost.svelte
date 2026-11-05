@@ -8,7 +8,6 @@
 	import { onMount } from 'svelte';
 	import { onFocus } from '$lib/scene/bus.js';
 	import { projects } from '$lib/data/projects.js';
-	import { ports } from '$lib/data/voyage.js';
 
 	const STAGES = ['home', 'about', 'skills', 'projects', 'experience', 'contact'];
 
@@ -92,12 +91,13 @@
 			voyage = createVoyage(canvas, {
 				quality: narrow ? 'low' : 'high',
 				destinations: projects.map((p) => ({ title: p.title })),
-				ports: ports.map((p) => ({ kind: p.kind })),
 				intro: playIntro,
 				onIntroEnd: () => (introRunning = false),
 				onFrame: (/** @type {number} */ haze) => {
 					if (hazeEl) hazeEl.style.opacity = String(Math.min(haze * 0.5, 0.5));
 				},
+				// the captain's flintlock goes off: the page glass takes the ball
+				onShot: () => window.dispatchEvent(new CustomEvent('captain-shot')),
 				// screen position of the island rising on the chart: project cards grow out of it
 				onPin: (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ on) => {
 					const st = document.documentElement.style;

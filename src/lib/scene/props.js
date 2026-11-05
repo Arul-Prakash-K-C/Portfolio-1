@@ -41,12 +41,22 @@ function span(mesh, a, b) {
 /* ------------------------------------------------------------------ */
 export function makeWheel(m) {
 	const root = new THREE.Group();
-	// pedestal
-	const ped = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.9, 0.34), m.darkWood);
-	ped.position.y = 0.45;
+	// pedestal: a turned wooden post on a stepped base, brass bands, bearing block on top
+	const prof = [
+		[0.0, 0.0], [0.17, 0.0], [0.17, 0.05], [0.14, 0.07], [0.13, 0.12], [0.085, 0.16], [0.075, 0.3],
+		[0.09, 0.36], [0.07, 0.42], [0.065, 0.62], [0.08, 0.7], [0.095, 0.78], [0.1, 0.84], [0.0, 0.86]
+	].map(([r, y]) => new THREE.Vector2(r, y));
+	const ped = new THREE.Mesh(new THREE.LatheGeometry(prof, 20), m.darkWood);
 	root.add(ped);
-	const cap = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.4), m.brass);
-	cap.position.y = 0.92;
+	for (const [y, r] of [[0.36, 0.093], [0.7, 0.083]]) {
+		const band = new THREE.Mesh(new THREE.TorusGeometry(r, 0.008, 6, 24), m.brass);
+		band.rotation.x = Math.PI / 2;
+		band.position.y = y;
+		root.add(band);
+	}
+	const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 14), m.brass);
+	cap.rotation.z = Math.PI / 2;
+	cap.position.set(0.04, 0.92, 0);
 	root.add(cap);
 	const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.36, 10), m.brass);
 	axle.rotation.z = Math.PI / 2;
@@ -389,8 +399,14 @@ export function makeMapTexture(destinations) {
 		b.stroke();
 	}
 	// coasts
-	const isles = spots.map(([x, y], i) => [x, y, 46 + (i % 3) * 8, 300 + i * 17]);
-	isles.push([60, 120, 60, 999], [980, 640, 70, 998], [520, 640, 40, 997]);
+	// generic coastline only: nothing on the chart hints at a project before it is reached
+	const isles = [
+		[60, 120, 60, 999],
+		[980, 640, 70, 998],
+		[520, 640, 40, 997],
+		[400, 90, 38, 996],
+		[700, 600, 30, 995]
+	];
 	for (const [x, y, rad, seed] of isles) {
 		for (let k = 3; k >= 1; k--) {
 			blob(b, x, y, rad + k * 9, seed);
@@ -460,66 +476,67 @@ export function makeMapTexture(destinations) {
 
 	let lastKey = '';
 	/**
-	 * @param {number} reveal 0..1 how much of the route is drawn
-	 * @param {number} active index of the highlighted destination (-1 none)
-	 * @param {number} pulse 0..1 animation phase for the active ring
+	 * The chart starts empty. Ink is laid down only as each project is reached:
+	 * the route runs on to the next location, then its mark and name appear.
+	 * @param {number} reach 0..n, how far the voyage has got (k = project k-1 reached)
+	 * @param {number} active index of the project in view (-1 none)
+	 * @param {number} pulse 0..1 animation phase for the active ripple
 	 */
-	function draw(reveal, active, pulse) {
-		const key = `${Math.round(reveal * 60)}|${active}|${Math.round(pulse * 8)}`;
+	function draw(reach, active, pulse) {
+		const key = `${Math.round(reach * 40)}|${active}|${Math.round(pulse * 8)}`;
 		if (key === lastKey) return;
 		lastKey = key;
 		ctx.drawImage(base, 0, 0);
-		// dotted route, revealed progressively
 		const n = spots.length;
-		const total = reveal * (n - 1);
-		ctx.strokeStyle = '#8a2a14';
+		// inked route between reached locations, drawn as it travels
+		ctx.strokeStyle = '#7d2614';
 		ctx.lineWidth = 4;
+		ctx.lineCap = 'round';
 		ctx.setLineDash([12, 10]);
 		ctx.beginPath();
 		ctx.moveTo(spots[0][0], spots[0][1]);
 		for (let i = 1; i < n; i++) {
-			const f = Math.min(Math.max(total - (i - 1), 0), 1);
+			const f = Math.min(Math.max(reach - i, 0), 1);
 			if (f <= 0) break;
 			const [x0, y0] = spots[i - 1];
 			const [x1, y1] = spots[i];
 			const cx = (x0 + x1) / 2,
 				cy = (y0 + y1) / 2 - 60;
-			// partial quadratic curve via subdivision
-			const steps = 20;
+			const steps = 24;
 			for (let k = 1; k <= steps * f; k++) {
 				const t = k / steps;
-				const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1;
-				const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y1;
-				ctx.lineTo(x, y);
+				ctx.lineTo((1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1, (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y1);
 			}
 		}
 		ctx.stroke();
 		ctx.setLineDash([]);
-		// destinations
+		// a location is marked only once the ink has arrived there
 		for (let i = 0; i < n; i++) {
+			const arrive = i === 0 ? Math.min(Math.max(reach, 0), 1) : Math.min(Math.max((reach - i - 0.75) / 0.25, 0), 1);
+			if (arrive <= 0) continue;
 			const [x, y] = spots[i];
-			const reached = i <= total + 0.001;
+			ctx.globalAlpha = arrive;
 			if (i === active) {
-				ctx.strokeStyle = `rgba(20,120,112,${0.9 - pulse * 0.6})`;
-				ctx.lineWidth = 5;
+				ctx.strokeStyle = `rgba(125,38,20,${0.55 - pulse * 0.5})`;
+				ctx.lineWidth = 3;
 				ctx.beginPath();
-				ctx.arc(x, y, 34 + pulse * 22, 0, Math.PI * 2);
+				ctx.arc(x, y, 30 + pulse * 26, 0, Math.PI * 2);
 				ctx.stroke();
 			}
 			ctx.lineWidth = 6;
-			ctx.strokeStyle = reached ? '#8a2a14' : 'rgba(90,60,25,.45)';
+			ctx.strokeStyle = '#7d2614';
+			const k = 14 * arrive;
 			ctx.beginPath();
-			ctx.moveTo(x - 14, y - 14);
-			ctx.lineTo(x + 14, y + 14);
-			ctx.moveTo(x + 14, y - 14);
-			ctx.lineTo(x - 14, y + 14);
+			ctx.moveTo(x - k, y - k);
+			ctx.lineTo(x + k, y + k);
+			ctx.moveTo(x + k, y - k);
+			ctx.lineTo(x - k, y + k);
 			ctx.stroke();
-			ctx.fillStyle = i === active ? '#0f5f58' : '#3d2810';
+			ctx.fillStyle = '#3d2810';
 			ctx.font = `${i === active ? 'bold ' : ''}26px Georgia, serif`;
 			ctx.textAlign = 'center';
 			ctx.fillText(destinations[i].title, x, y + 52);
-			ctx.font = 'bold 18px Georgia, serif';
-			ctx.fillText(String(i + 1).padStart(2, '0'), x, y - 26);
+			ctx.globalAlpha = 1;
 		}
 		ctx.textAlign = 'start';
 		tex.needsUpdate = true;

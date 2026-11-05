@@ -53,7 +53,7 @@
 					<span class="kind">{s.label}</span>
 					<a class="value" href={s.href} target="_blank" rel="noopener">@{s.handle}<span class="sr-only"> (opens in a new tab)</span></a>
 					<div class="acts">
-						<a class="btn btn-sm" href={s.href} target="_blank" rel="noopener">Open profile ↗<span class="sr-only"> on {s.label}</span></a>
+						<a class="btn btn-primary btn-sm" href={s.href} target="_blank" rel="noopener">Open profile ↗<span class="sr-only"> on {s.label}</span></a>
 					</div>
 				</li>
 			{/each}

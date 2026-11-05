@@ -14,8 +14,8 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { makeGalleon } from './galleon.js';
 import { makeMaterials, makeWheel, makeCaptain, makeChartTable, makeChest, MAP_SPOTS } from './props.js';
 import { makeSignalIsle } from './island.js';
-import { makePort } from './ports.js';
 import { makeOcean, makeReflection, makeSpray, waveHeight, SAIL_SPEED } from './ocean.js';
+import { loadCaptain } from './captain.js';
 
 const FOG = new THREE.Color('#0d1a2e');
 const MOON_POS = new THREE.Vector3(160, 74, -190);
@@ -239,7 +239,7 @@ const FilmShader = {
 const STAGE_KEYS = [
 	// t, camera position, look target, follow, screen offset (fraction of width, desktop only)
 	{ t: 0.5, pos: [-1.0, 4.4, 7.8], look: [-3.8, 2.4, 0], follow: 0.5, offset: 0.1 },
-	{ t: 1, pos: [-3.3, 3.12, 2.1], look: [-4.98, 2.66, 0.08], follow: 1, offset: 0.0 },
+	{ t: 1, pos: [-0.9, 2.75, 3.95], look: [-4.85, 2.25, 0.8], follow: 1, offset: 0.24 }, // About: captain on the right
 	{ t: 2, pos: [-1.3, 2.9, 1.6], look: [-1.86, 1.32, -0.04], follow: 1, offset: 0.2 },
 	{ t: 3, pos: [-2.0, 3.05, 0.78], look: [-2.03, 1.33, -0.02], follow: 1, offset: -0.2 },
 	{ t: 4, pos: [-17, 2.7, 11.5], look: [3, 2.2, 3.2], follow: 0.15, offset: 0.2 }, // outside: the ship passing each port
@@ -255,12 +255,14 @@ const smooth = (e0, e1, x) => {
 
 /**
  * @param {HTMLCanvasElement} canvas
- * @param {{ quality?: 'high'|'low', destinations?: {title:string}[], intro?: boolean, onIntroEnd?: () => void, onFrame?: (haze: number) => void, onPin?: (x: number, y: number, on: number) => void, ports?: {kind: string}[] }} [opts]
+ * @param {{ quality?: 'high'|'low', destinations?: {title:string}[], intro?: boolean, onIntroEnd?: () => void, onFrame?: (haze: number) => void, onPin?: (x: number, y: number, on: number) => void, onShot?: () => void, captainUrl?: string }} [opts]
  */
 export function createVoyage(canvas, opts = {}) {
 	const low = opts.quality === 'low';
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
-	const dpr = Math.min(window.devicePixelRatio || 1, low ? 1.25 : 1.5);
+	// render scale: up to 2× on high-density desktops (4K-class output), adapted to frame time below
+	const maxDpr = Math.min(window.devicePixelRatio || 1, low ? 1.25 : 2);
+	let dpr = Math.min(maxDpr, low ? 1.25 : 1.5);
 	renderer.setPixelRatio(dpr);
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -321,6 +323,20 @@ export function createVoyage(canvas, opts = {}) {
 	helm.root.rotation.y = Math.PI; // wheel faces aft, toward the captain
 	ship.add(helm.root);
 	const captain = makeCaptain(mats);
+	/* the rigged 3D captain replaces the simple one as soon as the model has loaded */
+	let hero = null;
+	loadCaptain(opts.captainUrl ?? '/models/captain.glb', {
+		aboutMark: new THREE.Vector3(0.12, 0, 0.82), // a step to starboard of the wheel, clear of the spokes
+		onShot: () => opts.onShot?.()
+	})
+		.then((h) => {
+			if (disposed) return;
+			hero = h;
+			h.root.position.copy(captain.root.position);
+			ship.add(h.root);
+			captain.root.visible = false;
+		})
+		.catch((err) => console.warn('Captain model unavailable; keeping the simple captain.', err));
 	captain.root.position.set(-5.05, 1.28, 0);
 	ship.add(captain.root);
 	// warm lantern key on the captain's face for the About close-up (from frame left)
@@ -331,42 +347,11 @@ export function createVoyage(canvas, opts = {}) {
 	table.root.position.set(-1.95, 0.5, 0);
 	ship.add(table.root);
 
-	/* project islands that rise out of the chart, one at a time, as each project comes into view */
-	const pinMats = {
-		sand: new THREE.MeshStandardMaterial({ color: '#c9a76b', roughness: 0.9 }),
-		hill: new THREE.MeshStandardMaterial({ color: '#4f6b3a', roughness: 0.85 }),
-		pole: new THREE.MeshStandardMaterial({ color: '#3b2817', roughness: 0.8 }),
-		flag: new THREE.MeshBasicMaterial({ color: '#5ad6c9', side: THREE.DoubleSide, toneMapped: false }),
-		beam: new THREE.MeshBasicMaterial({ color: '#5ad6c9', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
-		ring: new THREE.MeshBasicMaterial({ color: '#f3c46b', transparent: true, opacity: 0.8, toneMapped: false })
-	};
-	const pins = (opts.destinations ?? []).slice(0, MAP_SPOTS.length).map((_, i) => {
-		const g = new THREE.Group();
-		g.position.copy(table.spotToLocal(MAP_SPOTS[i][0], MAP_SPOTS[i][1]));
-		const isle = new THREE.Group();
-		const base = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 0.022, 10), pinMats.sand);
-		base.position.y = 0.011;
-		const hill = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.05, 8), pinMats.hill);
-		hill.position.set(-0.008, 0.045, 0.004);
-		const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 0.11, 6), pinMats.pole);
-		pole.position.set(0.018, 0.075, -0.01);
-		const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.024), pinMats.flag);
-		flag.position.set(0.039, 0.115, -0.01);
-		isle.add(base, hill, pole, flag);
-		const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.03, 0.42, 16, 1, true), pinMats.beam);
-		beam.position.y = 0.21;
-		const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.003, 6, 40), pinMats.ring.clone());
-		ring.rotation.x = Math.PI / 2;
-		ring.position.y = 0.004;
-		g.add(isle, beam, ring);
-		g.visible = false;
-		table.root.add(g);
-		return { g, isle, beam, ring, flag, pop: 0 };
-	});
-	const pinLight = new THREE.PointLight('#7fe6da', 0, 0.9, 1.5);
-	table.root.add(pinLight);
-	g.robot.group.position.set(-1.95, 0.5, -0.82);
-	g.robot.group.rotation.y = 0;
+	/* project locations on the chart (table space); nothing is placed there until the route arrives */
+	const spotsLocal = (opts.destinations ?? []).slice(0, MAP_SPOTS.length).map((_, i) => table.spotToLocal(MAP_SPOTS[i][0], MAP_SPOTS[i][1]));
+	let mapReach = 0;
+	// no robot crew: the captain is the only figure on deck
+	g.robot.group.removeFromParent();
 	const chest = makeChest(mats);
 	chest.root.position.set(4.15, 0.6, 0.15);
 	chest.root.rotation.y = 0.5;
@@ -374,18 +359,6 @@ export function createVoyage(canvas, opts = {}) {
 	const isle = makeSignalIsle();
 	isle.root.position.copy(ISLE_POS);
 
-	/* Experience: ports of call on the starboard side, passed one at a time */
-	const PORT_GAP = 30;
-	const PORT_X = 15; // where the current port sits: off the starboard bow
-	const portList = (opts.ports ?? []).map((p, i) => {
-		const port = makePort(p.kind, i + 1);
-		port.root.position.set(PORT_X + i * PORT_GAP, 0, 8 + (i % 2) * 2.5);
-		port.root.scale.setScalar(0.62);
-		port.root.rotation.y = i * 1.3;
-		anchor.add(port.root);
-		return { ...port, lit: 0 };
-	});
-	let portPos = 0;
 	anchor.add(isle.root);
 
 	/* post-processing (desktop / capable devices only) */
@@ -406,7 +379,8 @@ export function createVoyage(canvas, opts = {}) {
 	/* camera keys: the opening shots are authored in world space, the rest in anchor space */
 	anchor.updateMatrixWorld(true);
 	const toLocal = (v) => anchor.worldToLocal(new THREE.Vector3(...v));
-	const heroKey = { t: 0, pos: toLocal([-2, 2.4, 19]), look: toLocal([6.5, 5.2, -9]), follow: 0, offset: 0 };
+	// opening shot: off the port quarter, the captain at the wheel in the right third, sails above
+	const heroKey = { t: 0, pos: new THREE.Vector3(-9.6, 6.4, 7.6), look: new THREE.Vector3(-4.3, 2.55, -0.2), follow: 0, offset: 0.2 };
 	const introKey = { pos: toLocal([-16, 0.9, 46]), look: toLocal([6, 3.4, -9]) };
 	const keys = [
 		heroKey,
@@ -447,11 +421,11 @@ export function createVoyage(canvas, opts = {}) {
 		beaconWorld = new THREE.Vector3();
 	const handL = new THREE.Vector3(),
 		handR = new THREE.Vector3(),
-		restL = new THREE.Vector3(),
-		restR = new THREE.Vector3(),
-		saluteHand = new THREE.Vector3(),
-		saluteElbow = new THREE.Vector3(0.05, 1.47, 0.46);
-	let saluteT = -1;
+		gripTmp = new THREE.Vector3(),
+		grips = [
+			{ pos: new THREE.Vector3(), axis: new THREE.Vector3() },
+			{ pos: new THREE.Vector3(), axis: new THREE.Vector3() }
+		];
 	let pinFocus = 0;
 	const pinShip = new THREE.Vector3(),
 		tmpPin = new THREE.Vector3(),
@@ -485,6 +459,7 @@ export function createVoyage(canvas, opts = {}) {
 	}
 
 	let skipRender = false;
+	let disposed = false;
 	function frame(dt, realDt = dt) {
 		time += dt;
 		// story smoothing runs on real elapsed time so slow devices don't lag a stage behind
@@ -535,7 +510,8 @@ export function createVoyage(canvas, opts = {}) {
 		// bow height relative to the water just ahead: plunging throws spray
 		shipBow = ship.position.y + Math.sin(ship.rotation.z) * 5.5 - H(5.6, 0);
 		const plunge = dt > 0 ? (prevBow - shipBow) / dt : 0;
-		sprayPower += (Math.min(1, 0.35 + Math.max(0, plunge) * 1.6 + Math.max(0, -shipBow) * 0.8) - sprayPower) * Math.min(1, dt * 3);
+		sprayPower += (Math.min(1, 0.06 + Math.max(0, plunge - 0.15) * 1.8 + Math.max(0, -shipBow - 0.1) * 1.2) - sprayPower) * Math.min(1, dt * 4);
+		ocean.mat.uniforms.uBowSurge.value = sprayPower;
 		spray.mat.uniforms.uTime.value = time;
 		spray.mat.uniforms.uPower.value = sprayPower;
 		ship.updateMatrixWorld();
@@ -552,53 +528,40 @@ export function createVoyage(canvas, opts = {}) {
 		}
 		fp.needsUpdate = true;
 
-		// the wheel turns as the voyage moves between sections; the captain steers
-		const wheelTarget = tl * 1.25 + Math.sin(time * 0.5) * 0.06;
+		// the helmsman's small corrections: the wheel works back and forth with the sea
+		const wheelTarget = Math.sin(time * 0.33) * 0.16 + Math.sin(time * 0.11 + 1.3) * 0.1 - (ship.rotation.x || 0) * 0.8;
 		wheelAngle += (wheelTarget - wheelAngle) * Math.min(1, dt * 2);
 		helm.wheel.rotation.x = wheelAngle;
-		const sway = Math.sin(wheelAngle) * 0.05;
-
-		// About: the captain lets go of the wheel, turns to camera, salutes, and goes back to steering.
-		// It plays once each time the About shot is reached.
-		const atAbout = Math.abs(tl - 1) < 0.12 && Math.abs(target - 1) < 0.2;
-		if (atAbout && saluteT < 0) saluteT = 0;
-		if (Math.abs(tl - 1) > 0.55) saluteT = -1; // re-arm once we've left the shot
-		if (saluteT >= 0) saluteT += realDt;
-		const st = Math.max(saluteT, 0);
-		// phases (s): 0–0.9 turn · 0.9–1.5 hand up · 1.5–3.3 hold · 3.3–3.9 hand down · 3.9–5.0 back to the wheel
-		const turnW = saluteT < 0 ? 0 : smooth(0, 0.9, st) * (1 - smooth(3.9, 5.0, st));
-		const armW = saluteT < 0 ? 0 : smooth(0.9, 1.5, st) * (1 - smooth(3.3, 3.9, st));
-		const release = saluteT < 0 ? 0 : smooth(0.0, 0.5, st) * (1 - smooth(4.3, 5.0, st));
-		const yaw = -0.86 * turnW;
-		captain.root.rotation.y = yaw;
-		// wheel grips (ship space), expressed in the turned captain's local space
-		const toLocal = (x, y, z, out) => {
-			out.set(x, y, z);
-			const c = Math.cos(-yaw),
-				sn = Math.sin(-yaw);
-			return out.set(out.x * c + out.z * sn, out.y, -out.x * sn + out.z * c);
-		};
-		toLocal(0.45, 1.2 + sway, -0.3, handL);
-		toLocal(0.45, 1.2 - sway, 0.3, handR);
-		// hands drop to the sides on letting go; the right hand rises to the hat brim
-		restL.set(0.06, 0.92, -0.27);
-		restR.set(0.08, 0.95, 0.28);
-		handL.lerp(restL, release);
-		handR.lerp(restR, release * (1 - armW));
-		saluteHand.set(0.11, 1.75, 0.12);
-		handR.lerp(saluteHand, armW);
-		captain.reach([handL, handR], [null, saluteElbow], [0, armW]);
-		// head: the usual look-around, then straight down the lens (and a small nod) during the salute
-		captain.head.rotation.y = (Math.sin(time * 0.3) * 0.12 + smooth(0.6, 1, tl) * (1 - smooth(1.2, 1.8, tl)) * 0.2) * (1 - turnW) - 0.06 * turnW;
-		captain.head.rotation.z = Math.sin(time * 0.45) * 0.03 * (1 - armW) - 0.06 * armW * Math.max(0, Math.sin(Math.min(1, (st - 1.4) / 0.5) * Math.PI));
-		captain.coatMesh.rotation.y = Math.sin(time * 1.3) * 0.02;
+		const inAbout = Math.abs(tl - 1) < 0.2 && Math.abs(target - 1) < 0.3;
+		if (hero) {
+			// both hands on the spoke handles either side of the top spoke; they turn with the wheel
+			for (const [i, a] of [
+				[0, Math.PI / 4],
+				[1, -Math.PI / 4]
+			]) {
+				const dir = gripTmp.set(0, Math.cos(a), Math.sin(a));
+				const pos = dir.clone().multiplyScalar(0.555);
+				helm.wheel.localToWorld(pos);
+				hero.root.worldToLocal(pos);
+				const axis = dir.clone().transformDirection(helm.wheel.matrixWorld);
+				axis.transformDirection(hero.root.matrixWorld.clone().invert());
+				grips[i].pos.copy(pos);
+				grips[i].axis.copy(axis);
+			}
+			// the helm faces aft, so sort the handles by side: [right (+z), left (−z)]
+			if (grips[0].pos.z < grips[1].pos.z) grips.reverse();
+			hero.update({ time, dt, mode: inAbout ? 'about' : 'steer', grips, roll: ship.rotation.x, pitch: ship.rotation.z });
+		} else {
+			// fallback captain (model not loaded): steady hands on the wheel
+			const sway = Math.sin(wheelAngle) * 0.05;
+			handL.set(0.45, 1.2 + sway, -0.3);
+			handR.set(0.45, 1.2 - sway, 0.3);
+			captain.reach([handL, handR]);
+			captain.head.rotation.y = Math.sin(time * 0.3) * 0.12;
+			captain.coatMesh.rotation.y = Math.sin(time * 1.3) * 0.02;
+		}
 		faceKey.intensity = Math.max(0, 1 - Math.abs(tl - 1) / 0.6) * (3.2 + Math.sin(time * 7) * 0.25);
 
-		// robot navigator: works the chart, looks up at the camera on its stage
-		g.robot.armR.rotation.z = -1.1 + Math.sin(time * 3) * 0.35 * (1 - atTable * 0.7);
-		g.robot.group.rotation.y = Math.sin(time * 0.4) * 0.12 + atTable * 0.25;
-		g.robot.tip.visible = Math.sin(time * 4) > -0.6;
-		g.robot.term.update(time);
 
 		// compass: points at the skill category, then the active destination
 		let needleTarget = Math.sin(time * 0.7) * 0.08;
@@ -607,35 +570,18 @@ export function createVoyage(canvas, opts = {}) {
 		needleAngle += (needleTarget - needleAngle) * Math.min(1, dt * 3);
 		table.needle.rotation.y = -needleAngle + Math.sin(time * 6) * 0.01;
 
-		// the chart: route reveals through the projects section, active island pulses
-		const reveal = Math.min(1, smooth(2.4, 3, tl) * 0.18 + focus.projectsFrac * 0.92);
-		table.map.draw(reveal, tl > 2.5 && tl < 3.8 ? focus.project : -1, (time * 0.8) % 1);
+		// the chart starts empty; the inked route reaches each project as its card comes up
 		const atProjects = Math.max(0, 1 - Math.abs(tl - 3) / 0.45);
-		let activePin = null;
-		for (let i = 0; i < pins.length; i++) {
-			const pin = pins[i];
-			const want = i === focus.project && atProjects > 0.5 ? 1 : 0;
-			pin.pop += (want - pin.pop) * Math.min(1, dt * (want ? 3.2 : 5));
-			const e = pin.pop;
-			pin.g.visible = e > 0.01;
-			if (!pin.g.visible) continue;
-			// rise out of the paper with a little overshoot
-			const back = 1 + 2.2 * Math.pow(e - 1, 3) + 1.2 * Math.pow(e - 1, 2);
-			pin.isle.scale.set(Math.max(0.001, back), Math.max(0.001, back), Math.max(0.001, back));
-			pin.beam.scale.set(1, Math.max(0.001, e), 1);
-			pin.beam.material.opacity = 0.14 * e * (0.8 + 0.2 * Math.sin(time * 5));
-			const rp = (time * 0.9) % 1;
-			pin.ring.scale.setScalar(0.5 + rp * 1.4);
-			pin.ring.material.opacity = (1 - rp) * 0.8 * e;
-			pin.flag.rotation.y = Math.sin(time * 6) * 0.25;
-			if (want) activePin = pin;
-		}
-		if (activePin) pinLight.position.copy(activePin.g.position).add(tmpPin.set(0, 0.12, 0));
-		pinLight.intensity += ((activePin ? 0.18 : 0) - pinLight.intensity) * Math.min(1, dt * 4);
-		pinFocus += ((activePin ? 1 : 0) * atProjects - pinFocus) * Math.min(1, dt * 2.2);
-		if (activePin) {
-			// pin position in ship space, for the camera and the page
-			pinShip.copy(activePin.g.position);
+		const reachTarget = atProjects > 0.5 && focus.project >= 0 ? focus.project + 1 : tl > 3.5 ? mapReach : 0;
+		mapReach += (reachTarget - mapReach) * Math.min(1, dt * 1.8);
+		const activeSpot = atProjects > 0.5 && focus.project >= 0 && focus.project < spotsLocal.length ? focus.project : -1;
+		table.map.draw(mapReach, activeSpot, (time * 0.8) % 1);
+		// the camera leans in over the mark once the ink has arrived
+		const arrived = activeSpot >= 0 ? Math.min(Math.max((mapReach - activeSpot - 0.75) / 0.25, 0), 1) : 0;
+		pinFocus += (arrived * atProjects - pinFocus) * Math.min(1, dt * 2.2);
+		if (activeSpot >= 0) {
+			// mark position in ship space, for the camera and the page
+			pinShip.copy(spotsLocal[activeSpot]);
 			table.root.localToWorld(pinShip);
 			ship.worldToLocal(pinShip);
 		}
@@ -657,18 +603,7 @@ export function createVoyage(canvas, opts = {}) {
 		beaconLit += (finale - beaconLit) * Math.min(1, dt * 1.5);
 		isle.update(beaconLit, time);
 
-		// the ports glide past the starboard side as the log moves from one entry to the next
-		const atExp = Math.max(0, 1 - Math.abs(tl - 4) / 0.7);
-		const portTarget = focus.port >= 0 ? focus.port : tl < 4 ? -0.6 : portList.length - 0.4;
-		portPos += (portTarget - portPos) * Math.min(1, dt * 1.6);
-		for (let i = 0; i < portList.length; i++) {
-			const pt = portList[i];
-			pt.root.position.x = PORT_X + (i - portPos) * PORT_GAP;
-			pt.root.visible = atExp > 0.01 && i - portPos > -1.05 && i - portPos < 3.2;
-			const want = atExp > 0.3 && Math.abs(i - portPos) < 0.5 ? 1 : 0;
-			pt.lit += (want - pt.lit) * Math.min(1, dt * 2);
-			if (pt.root.visible) pt.update(pt.lit, time + i);
-		}
+
 		isle.light.getWorldPosition(beaconWorld);
 		ocean.mat.uniforms.uBeacon.value.copy(beaconWorld);
 		ocean.mat.uniforms.uBeaconI.value = beaconLit;
@@ -752,6 +687,26 @@ export function createVoyage(canvas, opts = {}) {
 		else renderer.render(scene, camera);
 	}
 
+	// adaptive resolution: step the render scale down when frames run long, back up when there is headroom
+	let ftAvg = 16,
+		ftFrames = 0;
+	function adaptScale(ms) {
+		ftAvg += (ms - ftAvg) * 0.05;
+		if (++ftFrames < 90) return;
+		let next = dpr;
+		if (ftAvg > 26 && dpr > 1) next = Math.max(1, dpr - 0.25);
+		else if (ftAvg < 17.6 && dpr < maxDpr) next = Math.min(maxDpr, dpr + 0.25);
+		if (next !== dpr) {
+			dpr = next;
+			renderer.setPixelRatio(dpr);
+			composer?.setPixelRatio(dpr);
+			stars.mat.uniforms.uPx.value = dpr;
+			spray.mat.uniforms.uPx.value = dpr;
+			resize();
+			ftFrames = 0;
+		}
+	}
+
 	function loop(now) {
 		raf = requestAnimationFrame(loop);
 		// rAF timestamps can predate `last` on a slow first frame: never step backwards
@@ -763,6 +718,7 @@ export function createVoyage(canvas, opts = {}) {
 		if (idle && frameNo % 2) return;
 		last = now;
 		frame(dt, real);
+		if (!idle) adaptScale(real * 1000); // frame-to-frame time includes the GPU's share
 	}
 
 	resize();
@@ -803,6 +759,14 @@ export function createVoyage(canvas, opts = {}) {
 		get haze() {
 			return haze;
 		},
+		/** scene internals for development probes only */
+		get debug() {
+			return import.meta.env.DEV ? { scene, camera, ship, THREE } : null;
+		},
+		/** the rigged captain once loaded (null until then) */
+		get hero() {
+			return hero;
+		},
 		/** current (smoothed) story position, 0..5 */
 		get timeline() {
 			return tl;
@@ -831,6 +795,7 @@ export function createVoyage(canvas, opts = {}) {
 		},
 		resize,
 		dispose() {
+			disposed = true;
 			this.stop();
 			scene.traverse((o) => {
 				if (o.geometry) o.geometry.dispose();

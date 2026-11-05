@@ -21,8 +21,8 @@ export const SAIL_SPEED = 2.4; // metres per second, the ship's speed through th
 /* ------------------------------------------------------------------ */
 // dirX, dirZ, steepness, wavelength. Total steepness < 1 keeps crests from looping.
 const WAVES = [
-	[1.0, 0.22, 0.13, 26],
-	[0.78, 0.62, 0.12, 15],
+	[1.0, 0.22, 0.085, 26],
+	[0.78, 0.62, 0.09, 15],
 	[-0.15, 1.0, 0.1, 9.5],
 	[0.95, -0.35, 0.09, 6.1],
 	[-0.65, -0.4, 0.07, 3.9],
@@ -169,12 +169,13 @@ export function makeOcean(segments, { fog, moonDir, reflections }) {
 			uShipDir: { value: new THREE.Vector2(1, 0) },
 			uSpeed: { value: SAIL_SPEED },
 			uWake: { value: 0 },
+			uBowSurge: { value: 0 },
 			uRefl: { value: null },
 			uReflOn: { value: reflections ? 1 : 0 },
 			uReflMat: { value: new THREE.Matrix4() }
 		},
 		vertexShader: /* glsl */ `
-      uniform float uTime, uWake;
+      uniform float uTime, uWake, uBowSurge;
       uniform vec2 uFlow;
       ${HULL_GLSL}
       varying vec3 vWorld;
@@ -192,13 +193,26 @@ export function makeOcean(segments, { fog, moonDir, reflections }) {
         float fade = 1.0 - smoothstep(90.0, 260.0, length(pos.xz - cameraPosition.xz));
         ${glslWaves}
         pos += disp * mix(0.35, 1.0, fade);
-        // the ship pushes the water: a bow cushion and a trough along the sides
+        // the hull displaces the water: the stem divides it, a bow crest runs out
+        // and aft along both sides, a trough sits amidships, a quarter wave rises
+        // at the stern, and diverging wake waves spread in a V behind
         vec2 q = shipLocal(pos.xz);
-        float hw = hullHalf(clamp(q.x, ${HULL_X0.toFixed(2)}, ${HULL_X1.toFixed(2)}));
-        float side = abs(q.y) - max(hw, 0.0);
-        float bow = exp(-pow((q.x - 5.4) / 1.4, 2.0)) * exp(-max(side, 0.0) * 1.6);
-        float trough = exp(-pow((q.x - 0.5) / 3.2, 2.0)) * exp(-max(side, 0.0) * 1.2);
-        pos.y += (bow * 0.32 - trough * 0.12) * uWake;
+        float hwC = max(hullHalf(clamp(q.x, ${HULL_X0.toFixed(2)}, ${HULL_X1.toFixed(2)})), 0.0);
+        float ay = abs(q.y);
+        float side = ay - hwC;
+        float surge = uWake * (1.0 + uBowSurge * 0.8);
+        // bow crest: starts at the stem, flares outward as it runs aft
+        float sbv = 6.3 - q.x;
+        float crestLine = hwC + 0.12 + max(sbv, 0.0) * 0.2;
+        float crestBreak = 0.65 + 0.35 * sin(sbv * 1.9 + q.y * 0.7 + uTime * 0.6);
+        float crest = exp(-pow((ay - crestLine) / (0.75 + max(sbv, 0.0) * 0.1), 2.0)) * smoothstep(-0.4, 0.6, sbv) * exp(-max(sbv, 0.0) * 0.3) * crestBreak;
+        float pile = exp(-pow((q.x - 6.0) / 0.9, 2.0)) * exp(-max(side, 0.0) * 2.2); // water piled at the stem
+        float trough = exp(-pow((q.x + 0.3) / 3.0, 2.0)) * exp(-max(side, 0.0) * 1.0);
+        float quarter = exp(-pow((q.x + 6.4) / 1.3, 2.0)) * exp(-max(side, 0.0) * 1.1);
+        // diverging (Kelvin) wave trains inside a 19.5° V from the bow, fading astern
+        float inV = smoothstep(0.0, 1.5, sbv * 0.354 + 0.4 - ay) * step(0.0, sbv);
+        float div = sin(sbv * 1.35 - ay * 2.6) * inV * smoothstep(5.5, 9.0, sbv) * exp(-max(sbv - 9.0, 0.0) * 0.035);
+        pos.y += (crest * 0.22 + pile * 0.22 - trough * 0.14 + quarter * 0.12 + div * 0.05) * surge;
         vNormal = normalize(mix(vec3(0.0, 1.0, 0.0), cross(bin, tang), fade * 0.85 + 0.15));
         vFold = 1.0 - jac;
         vLocal = q;
@@ -206,7 +220,7 @@ export function makeOcean(segments, { fog, moonDir, reflections }) {
         gl_Position = projectionMatrix * viewMatrix * vec4(pos, 1.0);
       }`,
 		fragmentShader: /* glsl */ `
-      uniform float uTime, uBeaconI, uFogD, uSpeed, uWake, uReflOn;
+      uniform float uTime, uBeaconI, uFogD, uSpeed, uWake, uReflOn, uBowSurge;
       uniform vec2 uFlow;
       uniform vec3 uMoonDir, uFog, uDeep, uScatter, uSky, uMoonCol, uLantern, uBeacon;
       uniform sampler2D uRefl;
@@ -255,7 +269,10 @@ export function makeOcean(segments, { fog, moonDir, reflections }) {
 
         // moon glitter path + broad sheen
         float md = max(dot(r, uMoonDir), 0.0);
-        col += uMoonCol * (pow(md, 600.0) * 4.0 + pow(md, 60.0) * 0.35 + pow(md, 8.0) * 0.04);
+        // churned water around the hull scatters the glint instead of mirroring it
+        float churn = exp(-max(abs(q.y) - max(hw, 0.0), 0.0) * 0.25) * smoothstep(-14.0, -2.0, -abs(q.x + 2.0) + 6.0) + smoothstep(0.0, 1.5, (6.3 - q.x) * 0.354 + 0.4 - abs(q.y)) * step(6.3, 6.3 - q.x + 6.3) * exp(-max(6.3 - q.x - 12.0, 0.0) * 0.03);
+        float glint = 1.0 - 0.75 * clamp(churn, 0.0, 1.0);
+        col += uMoonCol * (pow(md, 600.0) * 4.0 * glint + pow(md, 60.0) * 0.35 * glint + pow(md, 8.0) * 0.04);
         // warm lantern on the water
         vec3 ld = normalize(uLantern - vWorld);
         float ldist = length(uLantern - vWorld);
@@ -265,37 +282,38 @@ export function makeOcean(segments, { fog, moonDir, reflections }) {
         col += vec3(1.0, 0.6, 0.25) * pow(max(dot(r, bd), 0.0), 60.0) * 2.5 * uBeaconI;
 
         /* ---------------- foam ---------------- */
-        // whitecaps where the surface folds (Gerstner jacobian)
-        float cap = smoothstep(0.42, 0.75, vFold) * fbm(sp * 1.4 + uTime * 0.2);
-        // flowing foam texture, streamed aft along the hull
+        // whitecaps where the open sea folds (Gerstner jacobian)
+        float cap = smoothstep(0.62, 0.92, vFold) * smoothstep(0.58, 0.78, fbm(sp * 0.9 + uTime * 0.12)) * smoothstep(0.4, 0.7, fbm(sp * 3.3 - uTime * 0.2));
+        // foam lives in the ship's frame and is carried aft at sailing speed
         vec2 fq = vec2(q.x + uTime * uSpeed, q.y);
-        float streak = fbm(fq * vec2(0.9, 2.4));
-        float speck = noise(fq * 7.0);
-        // foam hugging the hull, heaviest at the bow
-        float bowness = smoothstep(1.5, 5.8, q.x);
-        float hullFoam = (1.0 - smoothstep(0.0, 0.35 + bowness * 0.9, side)) * step(0.0, hw) * (0.5 + bowness);
-        // turbulent centre track astern
-        float s = -6.1 - q.x;
-        float track = 0.0;
-        if (s > 0.0) {
-          float w = 1.3 + s * 0.09;
-          track = (1.0 - smoothstep(0.2 * w, w, abs(q.y))) * exp(-s * 0.035);
-        }
-        // Kelvin wake: two arms at ~19.5° from the bow, with transverse ripples
-        float sb = 6.2 - q.x;
-        float kel = 0.0;
-        if (sb > 0.0) {
-          float arm = 0.25 + sb * 0.354;
-          float wid = 0.35 + sb * 0.03;
-          kel = exp(-pow((abs(q.y) - arm) / wid, 2.0)) * exp(-sb * 0.028) * (0.55 + 0.45 * sin(sb * 2.4 - abs(q.y) * 1.2));
-        }
-        float wake = clamp(hullFoam + track * 0.8 + kel * 0.4, 0.0, 1.3) * uWake;
-        float foam = clamp(cap * 0.7 + wake * smoothstep(0.35, 0.85, streak + speck * 0.45), 0.0, 1.0);
+        // irregular patches: two octaves of thresholded noise, never a solid band
+        float lace = fbm(fq * vec2(0.8, 1.1) + 4.0);
+        float fine = fbm(fq * 3.1 + vec2(0.0, uTime * 0.3));
+        float patchy = smoothstep(0.42, 0.68, lace * 0.75 + fine * 0.45);
+        float ay = abs(q.y);
+        float sbv = 6.3 - q.x;
+        float bowness = smoothstep(0.5, 6.0, q.x);
+        float surge = 1.0 + uBowSurge * 0.9;
+        // contact foam: thin, turbulent, hugging the hull, thickest where the stem cuts in
+        float contact = (1.0 - smoothstep(0.0, 0.18 + bowness * 0.5 * surge, side)) * step(0.001, hw) * (0.45 + bowness * 0.9); // only alongside the hull itself
+        // the bow crest breaking as it runs aft along both sides
+        float crestLine = max(hw, 0.0) + 0.12 + max(sbv, 0.0) * 0.2;
+        float crestF = exp(-pow((ay - crestLine) / (0.3 + max(sbv, 0.0) * 0.08), 2.0)) * smoothstep(-0.3, 0.5, sbv) * exp(-max(sbv, 0.0) * 0.42) * surge;
+        // wake: a broad V behind the ship; turbulent near the stern, breaking into
+        // patches and fading with distance; densest just inside the V edges
+        float edge = sbv * 0.354 + 0.4;
+        float inV = smoothstep(0.0, 1.8, edge - ay) * smoothstep(9.0, 13.5, sbv);
+        float rim = exp(-pow((edge - ay - 0.9) / (0.9 + sbv * 0.04), 2.0));
+        float sternS = -6.1 - q.x;
+        float prop = sternS > 0.0 ? (1.0 - smoothstep(0.0, 1.4 + sternS * 0.1, ay)) * exp(-sternS * 0.05) : 0.0;
+        float wakeEnv = (inV * (0.25 + rim * 0.75) + prop) * exp(-max(sbv - 12.0, 0.0) * 0.03);
+        float wake = clamp(contact + crestF * 0.8 + wakeEnv * 0.75, 0.0, 1.2) * uWake;
+        float foam = clamp(cap * 0.45 + wake * patchy + contact * fine * 0.35 * uWake, 0.0, 1.0);
         float lit = 0.35 + 0.65 * max(dot(n, uMoonDir), 0.0);
-        vec3 foamCol = vec3(0.70, 0.76, 0.82) * lit + vec3(1.0, 0.62, 0.3) * exp(-ldist * 0.18) * 0.6;
-        col = mix(col, foamCol, foam * 0.7);
-        // turbulence below the foam lightens the water (aerated)
-        col += uScatter * wake * 0.35;
+        vec3 foamCol = vec3(0.66, 0.72, 0.78) * lit + vec3(1.0, 0.62, 0.3) * exp(-ldist * 0.18) * 0.5;
+        col = mix(col, foamCol, foam * 0.62);
+        // aerated water under and around the foam is paler and greener
+        col += uScatter * wake * (0.18 + 0.2 * lace);
 
         // atmospheric fog (matches scene.fog's exp2)
         float f = 1.0 - exp(-uFogD * uFogD * dist * dist);
@@ -393,17 +411,17 @@ export function makeSpray(count) {
       varying float vA;
       varying float vMist;
       void main(){
-        float life = 1.1 + aSeed.w * 0.8;
+        float life = 0.55 + aSeed.w * 0.5;
         float age = mod(uTime + aSeed.x * life * 7.0, life);
         float k = age / life;
         // birth point: along the bow flare, from the stem back ~3 m
         float along = aSeed.y;
         float bx = 5.9 - along * 3.2;
-        float bz = aSeed.z * (0.15 + along * 1.05);
+        float bz = aSeed.z * (0.3 + along * 1.15);
         vec3 p0 = vec3(bx, 0.05, bz);
-        // throw: outward and up, harder at the stem; mist is slower and bigger
-        float mist = step(0.78, aSeed.w);
-        vec3 vel = vec3(0.6 - along * 0.4, 2.2 + aSeed.w * 2.6 * (1.0 - along * 0.5), aSeed.z * (1.0 + aSeed.w * 1.6));
+        // thrown off the bow crest: low, outward and short-lived; mist drifts and fades
+        float mist = step(0.85, aSeed.w);
+        vec3 vel = vec3(0.3 - along * 0.3, 0.8 + aSeed.w * 1.4 * (1.0 - along * 0.6), aSeed.z * (0.7 + aSeed.w * 1.1));
         vel *= mix(1.0, 0.45, mist);
         vec3 p = p0 + vel * age + vec3(-uSpeed * age, -4.9 * age * age * mix(1.0, 0.2, mist), 0.0);
         p.y = max(p.y, -0.1);

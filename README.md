@@ -82,9 +82,10 @@ Every claim is backed by a source, and each case study names its own:
 
 | Asset | Source | License |
 | --- | --- | --- |
-| Galleon, captain and salute animation, robot, wheel, chart table, map, project islands, compass, telescope, logbook, chest, lighthouse ports, Signal Isle, ocean (waves, wake, spray, reflections), sky, textures, favicon, fallback illustrations | Original, generated in code for this site (no imported models; the ship and characters are original designs, not replicas of any film or game) | Part of this repo |
+| Galleon, fallback captain, captain animation, sea chart / flintlock / cutlass props, wheel, chart table, map, project islands, compass, telescope, logbook, chest, lighthouse ports, Signal Isle, ocean (waves, wake, spray, reflections), sky, textures, favicon, fallback illustrations | Original, generated in code for this site (no imported models; the ship and characters are original designs, not replicas of any film or game) | Part of this repo |
 | Project screenshots | Arul's own project reports | Arul's own work |
 | Captain portrait (`static/portrait/captain.webp`, `captain-640.webp`) | AI-generated with CellCog from Arul's own photo; original costume, not based on any film character; metadata stripped | Arul's own likeness, used with permission |
+| 3D captain (`static/models/captain.glb`) | Mesh and texture generated with CellCog (rapid image-to-3D) from Arul’s own reference sheets (`set-1` turnaround); skeleton, skin weights and all animation built for this site (Blender script + code) | Arul’s own likeness, used with permission |
 | Cinzel font | `@fontsource/cinzel` | SIL OFL 1.1 |
 | Inter font | `@fontsource-variable/inter` | SIL OFL 1.1 |
 | JetBrains Mono font | `@fontsource/jetbrains-mono` | SIL OFL 1.1 |
